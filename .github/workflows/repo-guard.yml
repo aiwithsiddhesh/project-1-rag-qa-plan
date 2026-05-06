@@ -35,7 +35,7 @@ jobs:
             exit 1
           fi
 
-          if git grep -nE 'sk-[A-Za-z0-9_-]{20,}|OPENAI_API_KEY=.+|LANGSMITH_API_KEY=.+' -- . ':!*.example'; then
+          if git grep -nE 'sk-[A-Za-z0-9_-]{20,}|OPENAI_API_KEY=.+|LANGSMITH_API_KEY=.+' -- . ':!*.example' ':!.github/workflows/repo-guard.yml'; then
             echo "Potential secret value found in tracked files."
             exit 1
           fi
