@@ -39,7 +39,7 @@ def truncate_text(text: str, max_chars: int = 200) -> str:
     if max_chars < 0:
         raise ValueError("max_chars must be greater than or equal to 0")
 
-    normalized = " ".join(text.split())
+    normalized = " ".join(text.lstrip()[: max_chars * 2].split())
     if len(normalized) <= max_chars:
         return normalized
     if max_chars <= 3:

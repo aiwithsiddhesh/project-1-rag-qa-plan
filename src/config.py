@@ -32,9 +32,10 @@ class Settings(BaseSettings):
     @field_validator("openai_api_key")
     @classmethod
     def validate_openai_api_key(cls, value: SecretStr) -> SecretStr:
-        if not value.get_secret_value().strip():
+        secret_val = value.get_secret_value().strip()
+        if not secret_val:
             raise ValueError("OPENAI_API_KEY must not be empty")
-        return value
+        return SecretStr(secret_val)
 
     @field_validator("chunk_overlap")
     @classmethod
