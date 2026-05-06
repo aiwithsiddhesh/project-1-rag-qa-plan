@@ -54,4 +54,6 @@ def timer_context(name: str) -> Iterator[None]:
         yield
     finally:
         elapsed_ms = (perf_counter() - start) * 1000
-        logger.info("{name} completed in {elapsed_ms:.2f} ms", name=name, elapsed_ms=elapsed_ms)
+        logger.info(
+            "{name} completed in {elapsed_ms:.2f} ms", name=name, elapsed_ms=elapsed_ms
+        )

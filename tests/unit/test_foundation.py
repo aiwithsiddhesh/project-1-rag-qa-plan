@@ -44,12 +44,16 @@ def test_settings_reject_invalid_chunk_size(chunk_size: int) -> None:
 
 
 def test_settings_reject_chunk_overlap_greater_than_or_equal_to_size() -> None:
-    with pytest.raises(ValidationError, match="chunk_overlap must be less than chunk_size"):
+    with pytest.raises(
+        ValidationError, match="chunk_overlap must be less than chunk_size"
+    ):
         Settings(openai_api_key="test-api-key", chunk_size=500, chunk_overlap=500)
 
 
 def test_settings_reject_weights_that_do_not_sum_to_one() -> None:
-    with pytest.raises(ValidationError, match="bm25_weight and dense_weight must sum to 1.0"):
+    with pytest.raises(
+        ValidationError, match="bm25_weight and dense_weight must sum to 1.0"
+    ):
         Settings(openai_api_key="test-api-key", bm25_weight=0.8, dense_weight=0.6)
 
 
@@ -58,7 +62,9 @@ def test_settings_requires_non_empty_openai_api_key() -> None:
         Settings(openai_api_key="")
 
 
-def test_module_settings_singleton_loads_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_module_settings_singleton_loads_from_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "env-api-key")
 
     config = importlib.import_module("src.config")

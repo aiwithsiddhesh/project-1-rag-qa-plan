@@ -49,10 +49,20 @@ class Settings(BaseSettings):
     @field_validator("log_level")
     @classmethod
     def normalize_log_level(cls, value: str) -> str:
-        allowed_levels = {"TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"}
+        allowed_levels = {
+            "TRACE",
+            "DEBUG",
+            "INFO",
+            "SUCCESS",
+            "WARNING",
+            "ERROR",
+            "CRITICAL",
+        }
         normalized = value.upper()
         if normalized not in allowed_levels:
-            raise ValueError(f"log_level must be one of: {', '.join(sorted(allowed_levels))}")
+            raise ValueError(
+                f"log_level must be one of: {', '.join(sorted(allowed_levels))}"
+            )
         return normalized
 
     @model_validator(mode="after")
@@ -62,4 +72,4 @@ class Settings(BaseSettings):
         return self
 
 
-settings = Settings()
+settings = Settings()  # type: ignore[call-arg]
