@@ -2,6 +2,9 @@
 .codex/
 AGENTS.md
 
+# Claude Code local settings (commands, skills, agents are committed; local settings are not)
+.claude/settings.local.json
+
 # Secrets and local environment files
 .env
 .env.*
