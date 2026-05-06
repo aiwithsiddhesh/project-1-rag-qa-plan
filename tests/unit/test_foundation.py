@@ -2,6 +2,7 @@ import importlib
 import os
 from pathlib import Path
 
+from loguru import logger
 import pytest
 from pydantic import ValidationError
 
@@ -110,6 +111,22 @@ def test_truncate_text_rejects_negative_length() -> None:
         truncate_text("text", max_chars=-1)
 
 
+def test_settings_normalize_log_level_to_uppercase() -> None:
+    settings = Settings(openai_api_key="test-api-key", log_level="debug")
+    assert settings.log_level == "DEBUG"
+
+
+def test_settings_reject_invalid_log_level() -> None:
+    with pytest.raises(ValidationError, match="log_level"):
+        Settings(openai_api_key="test-api-key", log_level="VERBOSE")
+
+
 def test_timer_context_logs_elapsed_time() -> None:
-    with timer_context("unit-test-operation"):
-        pass
+    messages: list[str] = []
+    handler_id = logger.add(lambda msg: messages.append(str(msg)), level="INFO", format="{message}")
+    try:
+        with timer_context("unit-test-operation"):
+            pass
+    finally:
+        logger.remove(handler_id)
+    assert any("unit-test-operation completed in" in m for m in messages)
