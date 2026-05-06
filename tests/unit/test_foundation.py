@@ -123,7 +123,9 @@ def test_settings_reject_invalid_log_level() -> None:
 
 def test_timer_context_logs_elapsed_time() -> None:
     messages: list[str] = []
-    handler_id = logger.add(lambda msg: messages.append(str(msg)), level="INFO", format="{message}")
+    handler_id = logger.add(
+        lambda msg: messages.append(str(msg)), level="INFO", format="{message}"
+    )
     try:
         with timer_context("unit-test-operation"):
             pass
