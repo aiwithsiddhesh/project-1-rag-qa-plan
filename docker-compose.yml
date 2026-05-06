@@ -1,0 +1,31 @@
+services:
+  api:
+    image: python:3.11-slim
+    working_dir: /app
+    command: sh -c "pip install -r requirements.txt && uvicorn api.main:app --host 0.0.0.0 --port 8000"
+    env_file:
+      - .env.example
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/readiness')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  ui:
+    image: python:3.11-slim
+    working_dir: /app
+    command: sh -c "pip install -r requirements.txt && streamlit run app/streamlit_app.py --server.address 0.0.0.0 --server.port 8501"
+    env_file:
+      - .env.example
+    ports:
+      - "8501:8501"
+    volumes:
+      - .:/app
+    depends_on:
+      api:
+        condition: service_healthy
