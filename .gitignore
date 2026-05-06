@@ -1,6 +1,8 @@
-# Local Codex/project agent metadata
+# Local agent metadata (Codex and Claude Code)
 .codex/
 AGENTS.md
+.claude/
+CLAUDE.md
 
 # Secrets and local environment files
 .env
