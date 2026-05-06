@@ -1,0 +1,54 @@
+name: Repo Guard
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  repository-hygiene:
+    name: Repository hygiene
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Block secrets and generated artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          forbidden_paths_regex='(^|/)(\.env$|\.env\..+|results/|data/vectorstore/.+)'
+          if git ls-files | grep -E "$forbidden_paths_regex"; then
+            if git ls-files | grep -E "$forbidden_paths_regex" | grep -Ev '^(\.env\.example|data/vectorstore/\.gitignore)$'; then
+              echo "Forbidden local secrets or generated artifacts are tracked."
+              exit 1
+            fi
+          fi
+
+          if git ls-files | grep -E '(^|/)(\.codex/|AGENTS\.md$)'; then
+            echo "Local agent metadata should not be tracked unless intentionally made public."
+            exit 1
+          fi
+
+          if git grep -nE 'sk-[A-Za-z0-9_-]{20,}|OPENAI_API_KEY=.+|LANGSMITH_API_KEY=.+' -- . ':!*.example'; then
+            echo "Potential secret value found in tracked files."
+            exit 1
+          fi
+
+      - name: Check large tracked files
+        shell: bash
+        run: |
+          set -euo pipefail
+          max_bytes=$((5 * 1024 * 1024))
+          while IFS= read -r file; do
+            size=$(wc -c < "$file")
+            if [ "$size" -gt "$max_bytes" ]; then
+              echo "Tracked file exceeds 5 MiB: $file ($size bytes)"
+              exit 1
+            fi
+          done < <(git ls-files)
