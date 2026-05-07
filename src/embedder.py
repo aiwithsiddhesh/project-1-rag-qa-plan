@@ -15,6 +15,8 @@ from src.exceptions import (
 
 # IndexFlatIP (exact brute-force) — correct for corpora <10K chunks.
 # At 50K+ chunks, switch to IndexIVFFlat or HNSW to reduce search latency.
+# Populated once by RAGPipeline.__init__ at startup before any concurrent requests arrive;
+# no lock needed because access is single-threaded at initialization time (Phase 6/7 design).
 _EMBEDDING_CACHE: dict[str, HuggingFaceEmbeddings] = {}
 
 
