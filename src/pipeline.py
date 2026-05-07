@@ -37,7 +37,7 @@ class RAGPipeline:
         self._retriever = HybridRetriever(vectorstore, chunks, settings)
         self._llm = ChatOpenAI(
             model=settings.openai_model,
-            api_key=settings.openai_api_key,  # type: ignore[arg-type]  # pydantic v1/v2 compat
+            api_key=settings.openai_api_key.get_secret_value(),  # type: ignore[arg-type]  # str not assignable to pydantic.v1.SecretStr
         )
 
         self._ready = True
