@@ -67,7 +67,7 @@ def build_vectorstore(
 
 def load_vectorstore(save_path: Path, embedding_model: HuggingFaceEmbeddings) -> FAISS:
     """Load a previously persisted FAISS vectorstore from disk."""
-    if not save_path.exists():
+    if not save_path.is_dir():
         raise VectorStoreNotFoundError(
             f"Vectorstore not found at {save_path}. Run `make ingest` first.",
             source_path=save_path,
