@@ -1,10 +1,7 @@
-import os
 from pathlib import Path
 
 import pytest
 from langchain_core.documents import Document
-
-os.environ.setdefault("OPENAI_API_KEY", "test-api-key")
 
 from src.exceptions import ChunkingError, DocumentLoadError
 from src.ingest import chunk_documents, load_documents
