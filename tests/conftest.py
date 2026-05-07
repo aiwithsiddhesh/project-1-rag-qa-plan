@@ -90,7 +90,7 @@ def sample_chunks() -> list[Document]:
 def mock_embedding_model() -> MagicMock:
     model = MagicMock()
     vector = np.ones(384).tolist()
-    model.embed_documents.return_value = [vector for _ in range(5)]
+    model.embed_documents.side_effect = lambda texts: [vector for _ in texts]
     model.embed_query.return_value = vector
     return model
 
