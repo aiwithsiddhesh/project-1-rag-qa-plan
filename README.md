@@ -2,7 +2,7 @@
 
 This repository is being built phase by phase from `project-1-rag-qa-plan.md`.
 
-Current status: Phase 5 complete — Generation. Phase 6 (Pipeline Orchestration) next.
+Current status: Phase 6 complete — Pipeline Orchestration. Phase 7 (API Layer) next.
 
 ## Implemented
 
@@ -20,11 +20,6 @@ Current status: Phase 5 complete — Generation. Phase 6 (Pipeline Orchestration
 - `build_vectorstore(chunks, embedding_model, save_path)` — builds FAISS index from chunks, creates parent dirs, persists to disk
 - `load_vectorstore(save_path, embedding_model)` — loads persisted index; raises `VectorStoreNotFoundError` (with "Run `make ingest` first" hint) if missing, `VectorStoreCorruptError` on deserialization failure
 
-**Phase 5 — Generation**
-- `build_prompt(question, context_chunks)` in `src/generator.py` — formats each chunk as `[Source: {source_file}, chunk {chunk_index}]`, applies a 3000-char context budget (truncates from the end so most-relevant chunks are preserved), embeds in a hardcoded grounded-answer template
-- `call_llm_with_retry(prompt, llm)` — tenacity retry with `stop_after_attempt(3)` and `wait_exponential(min=1, max=10)` on `openai.RateLimitError`; raises `GenerationTimeoutError` after retries are exhausted; raises `GenerationError` for all other failures
-- `extract_citations(answer, source_documents)` — returns unique `source_file` names whose filename appears as a substring in the answer text
-
 **Phase 4 — Advanced Retrieval**
 - `HybridRetriever` in `src/retriever.py` — BM25 + dense MMR retrieval fused via Reciprocal Rank Fusion (RRF k=60); deduplicates by `page_content`; configurable `mmr_lambda` (default 0.7)
 - `retrieve_dense(query, k, fetch_k)` — FAISS MMR search; `lambda_mult` from `settings.mmr_lambda`
@@ -32,6 +27,16 @@ Current status: Phase 5 complete — Generation. Phase 6 (Pipeline Orchestration
 - `retrieve_hybrid(query, k)` — fuses both retrieval paths with RRF; docs appearing in both lists rank higher than docs in one
 - `expand_query_hyde(query, llm)` — generates a hypothetical answer to close the query-document distribution gap; falls back to original query on failure
 - `CrossEncoderReranker` in `src/reranker.py` — batch `CrossEncoder.predict` on `(query, doc)` pairs; sorted descending; falls back to original order with logged warning on failure
+
+**Phase 5 — Generation**
+- `build_prompt(question, context_chunks)` in `src/generator.py` — formats each chunk as `[Source: {source_file}, chunk {chunk_index}]`, applies a 3000-char context budget (truncates from the end so most-relevant chunks are preserved), embeds in a hardcoded grounded-answer template
+- `call_llm_with_retry(prompt, llm)` — tenacity retry with `stop_after_attempt(3)` and `wait_exponential(min=1, max=10)` on `openai.RateLimitError`; raises `GenerationTimeoutError` after retries are exhausted; raises `GenerationError` for all other failures
+- `extract_citations(answer, source_documents)` — returns unique `source_file` names whose filename appears as a substring in the answer text
+
+**Phase 6 — Pipeline Orchestration**
+- `RAGPipeline` in `src/pipeline.py` — wires all components: loads embedding model → loads vectorstore → extracts chunks → initializes `CrossEncoderReranker` → initializes `HybridRetriever` → initializes `ChatOpenAI`
+- `query(question)` — validates length (3–2000 chars), optional HyDE expansion, hybrid retrieval of `top_k × fetch_k_multiplier` candidates, reranks to `top_k`, builds prompt, calls LLM with retry, extracts citations; wrapped in `timer_context` for latency logging; returns `{"answer", "sources", "num_chunks_retrieved", "retrieval_scores"}`
+- `is_ready()` — returns `True` when vectorstore loaded; used by the `/readiness` endpoint (Phase 7)
 
 ## Tests
 
@@ -41,6 +46,7 @@ Current status: Phase 5 complete — Generation. Phase 6 (Pipeline Orchestration
 - `tests/unit/test_retriever.py` — tests covering dense/BM25/hybrid retrieval, RRF ordering, deduplication, and HyDE fallback
 - `tests/unit/test_reranker.py` — tests covering relevance ordering, top_n, CrossEncoder failure fallback
 - `tests/unit/test_generator.py` — tests covering prompt construction, source headers, context budget truncation, tenacity retry behaviour, GenerationTimeoutError, GenerationError, and citation extraction
+- `tests/unit/test_pipeline.py` — tests covering RAGPipeline init wiring, is_ready, query happy path, HyDE toggle, question length validation, reranker call, and retrieval candidate count
 - `tests/conftest.py` — shared fixtures (sample TXT/PDF/DOCX, empty dir, `sample_chunks`, `mock_embedding_model`, `mock_vectorstore`, `mock_llm`)
 
 Run tests:
