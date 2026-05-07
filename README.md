@@ -2,7 +2,7 @@
 
 This repository is being built phase by phase from `project-1-rag-qa-plan.md`.
 
-Current status: Phase 3 complete — Embedding + Vector Store. Phase 4 (Advanced Retrieval) next.
+Current status: Phase 4 complete — Advanced Retrieval. Phase 5 (Generation) next.
 
 ## Implemented
 
@@ -20,12 +20,22 @@ Current status: Phase 3 complete — Embedding + Vector Store. Phase 4 (Advanced
 - `build_vectorstore(chunks, embedding_model, save_path)` — builds FAISS index from chunks, creates parent dirs, persists to disk
 - `load_vectorstore(save_path, embedding_model)` — loads persisted index; raises `VectorStoreNotFoundError` (with "Run `make ingest` first" hint) if missing, `VectorStoreCorruptError` on deserialization failure
 
+**Phase 4 — Advanced Retrieval**
+- `HybridRetriever` in `src/retriever.py` — BM25 + dense MMR retrieval fused via Reciprocal Rank Fusion (RRF k=60); deduplicates by `page_content`; configurable `mmr_lambda` (default 0.7)
+- `retrieve_dense(query, k, fetch_k)` — FAISS MMR search; `lambda_mult` from `settings.mmr_lambda`
+- `retrieve_bm25(query, k)` — BM25Okapi over all chunks; tokenization consistent at index and query time via shared `_tokenize` helper
+- `retrieve_hybrid(query, k)` — fuses both retrieval paths with RRF; docs appearing in both lists rank higher than docs in one
+- `expand_query_hyde(query, llm)` — generates a hypothetical answer to close the query-document distribution gap; falls back to original query on failure
+- `CrossEncoderReranker` in `src/reranker.py` — batch `CrossEncoder.predict` on `(query, doc)` pairs; sorted descending; falls back to original order with logged warning on failure
+
 ## Tests
 
 - `tests/unit/test_foundation.py` — Phase 1 unit tests
 - `tests/unit/test_ingest.py` — 17 tests covering load, chunking, metadata, and error cases
 - `tests/unit/test_embedder.py` — 13 tests covering model caching, build, and load error paths
-- `tests/conftest.py` — shared fixtures (sample TXT/PDF/DOCX, empty dir, `sample_chunks`, `mock_embedding_model`, `mock_vectorstore`)
+- `tests/unit/test_retriever.py` — tests covering dense/BM25/hybrid retrieval, RRF ordering, deduplication, and HyDE fallback
+- `tests/unit/test_reranker.py` — tests covering relevance ordering, top_n, CrossEncoder failure fallback
+- `tests/conftest.py` — shared fixtures (sample TXT/PDF/DOCX, empty dir, `sample_chunks`, `mock_embedding_model`, `mock_vectorstore`, `mock_llm`)
 
 Run tests:
 
