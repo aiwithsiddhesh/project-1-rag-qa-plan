@@ -22,7 +22,9 @@ def sample_txt_path(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def sample_pdf_path(tmp_path: Path) -> Path:
-    fitz = pytest.importorskip("fitz", reason="PyMuPDF not available on this system", exc_type=ImportError)
+    fitz = pytest.importorskip(
+        "fitz", reason="PyMuPDF not available on this system", exc_type=ImportError
+    )
     path = tmp_path / "sample.pdf"
     doc = fitz.open()
     page = doc.new_page()

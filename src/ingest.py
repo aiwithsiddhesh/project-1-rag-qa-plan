@@ -1,7 +1,11 @@
 from datetime import datetime, timezone
 from pathlib import Path
 
-from langchain_community.document_loaders import Docx2txtLoader, PyMuPDFLoader, TextLoader
+from langchain_community.document_loaders import (
+    Docx2txtLoader,
+    PyMuPDFLoader,
+    TextLoader,
+)
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from loguru import logger
