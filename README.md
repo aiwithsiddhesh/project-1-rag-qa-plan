@@ -2,7 +2,7 @@
 
 This repository is being built phase by phase from `project-1-rag-qa-plan.md`.
 
-Current status: Phase 7 complete — API Layer. Phase 8 (Streamlit UI) next.
+Current status: Phase 8 complete — Streamlit UI. Phase 9 (Scripts + RAGAS Eval) next.
 
 ## Implemented
 
@@ -43,6 +43,11 @@ Current status: Phase 7 complete — API Layer. Phase 8 (Streamlit UI) next.
 - `api/middleware.py` — `RequestLoggingMiddleware` (JSON logs: request_id, method, path, status, latency_ms, question_preview, num_chunks_retrieved; injects `X-Request-ID` UUID response header), `setup_cors`, `limiter` (slowapi, 60 req/min on `/query`)
 - `api/main.py` — FastAPI app with lifespan (startup builds `RAGPipeline`, shutdown clears it); `POST /query` (async via `asyncio.to_thread`, supports per-query `use_hyde` and `top_k`, maps `RAGException` subclasses to HTTP 503/504/422); `GET /health` (liveness, always 200); `GET /readiness` (503 if pipeline not ready — Kubernetes uses this before routing traffic); `GET /metrics` (Prometheus via `prometheus-fastapi-instrumentator`)
 
+**Phase 8 — Streamlit UI**
+- `app/streamlit_app.py` — chat UI backed by the FastAPI service; sidebar controls for API URL, API health/readiness, `top_k`, and HyDE
+- Assistant responses display answer text, collapsed source expander, and query stats footer (`Retrieved N chunks | X.Xs`)
+- UI distinguishes unreachable API errors, API/RAG service errors, and grounded no-context fallback responses
+
 ## Tests
 
 - `tests/unit/test_foundation.py` — Phase 1 unit tests
@@ -52,6 +57,7 @@ Current status: Phase 7 complete — API Layer. Phase 8 (Streamlit UI) next.
 - `tests/unit/test_reranker.py` — tests covering relevance ordering, top_n, CrossEncoder failure fallback
 - `tests/unit/test_generator.py` — tests covering prompt construction, source headers, context budget truncation, tenacity retry behaviour, GenerationTimeoutError, GenerationError, and citation extraction
 - `tests/unit/test_pipeline.py` — tests covering RAGPipeline init wiring, is_ready, query happy path, HyDE toggle (settings and per-call override), `top_k` override, question length validation, reranker call, and retrieval candidate count
+- `tests/unit/test_streamlit_app.py` — tests covering Streamlit API helper behavior, health/readiness handling, API-down errors, `top_k`/HyDE payloads, and no-context detection
 - `tests/integration/test_api_integration.py` — integration tests covering /health, /readiness (200 and 503), POST /query (200, 422 for short/long input and invalid `top_k`, 503 when not ready), X-Request-ID header, use_hyde/top_k passthrough, and rate-limit 429
 - `tests/conftest.py` — shared fixtures (sample TXT/PDF/DOCX, empty dir, `sample_chunks`, `mock_embedding_model`, `mock_vectorstore`, `mock_llm`)
 
