@@ -2,7 +2,7 @@
 
 This repository is being built phase by phase from `project-1-rag-qa-plan.md`.
 
-Current status: Phase 4 complete — Advanced Retrieval. Phase 5 (Generation) next.
+Current status: Phase 5 complete — Generation. Phase 6 (Pipeline Orchestration) next.
 
 ## Implemented
 
@@ -20,6 +20,11 @@ Current status: Phase 4 complete — Advanced Retrieval. Phase 5 (Generation) ne
 - `build_vectorstore(chunks, embedding_model, save_path)` — builds FAISS index from chunks, creates parent dirs, persists to disk
 - `load_vectorstore(save_path, embedding_model)` — loads persisted index; raises `VectorStoreNotFoundError` (with "Run `make ingest` first" hint) if missing, `VectorStoreCorruptError` on deserialization failure
 
+**Phase 5 — Generation**
+- `build_prompt(question, context_chunks)` in `src/generator.py` — formats each chunk as `[Source: {source_file}, chunk {chunk_index}]`, applies a 3000-char context budget (truncates from the end so most-relevant chunks are preserved), embeds in a hardcoded grounded-answer template
+- `call_llm_with_retry(prompt, llm)` — tenacity retry with `stop_after_attempt(3)` and `wait_exponential(min=1, max=10)` on `openai.RateLimitError`; raises `GenerationTimeoutError` after retries are exhausted; raises `GenerationError` for all other failures
+- `extract_citations(answer, source_documents)` — returns unique `source_file` names whose filename appears as a substring in the answer text
+
 **Phase 4 — Advanced Retrieval**
 - `HybridRetriever` in `src/retriever.py` — BM25 + dense MMR retrieval fused via Reciprocal Rank Fusion (RRF k=60); deduplicates by `page_content`; configurable `mmr_lambda` (default 0.7)
 - `retrieve_dense(query, k, fetch_k)` — FAISS MMR search; `lambda_mult` from `settings.mmr_lambda`
@@ -35,6 +40,7 @@ Current status: Phase 4 complete — Advanced Retrieval. Phase 5 (Generation) ne
 - `tests/unit/test_embedder.py` — 13 tests covering model caching, build, and load error paths
 - `tests/unit/test_retriever.py` — tests covering dense/BM25/hybrid retrieval, RRF ordering, deduplication, and HyDE fallback
 - `tests/unit/test_reranker.py` — tests covering relevance ordering, top_n, CrossEncoder failure fallback
+- `tests/unit/test_generator.py` — tests covering prompt construction, source headers, context budget truncation, tenacity retry behaviour, GenerationTimeoutError, GenerationError, and citation extraction
 - `tests/conftest.py` — shared fixtures (sample TXT/PDF/DOCX, empty dir, `sample_chunks`, `mock_embedding_model`, `mock_vectorstore`, `mock_llm`)
 
 Run tests:
