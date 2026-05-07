@@ -101,13 +101,30 @@ class TestQueryEndpoint:
         self, client: TestClient, mock_pipeline: MagicMock
     ) -> None:
         client.post("/query", json={"question": "What is ML?", "use_hyde": True})
-        mock_pipeline.query.assert_called_once_with("What is ML?", True)
+        mock_pipeline.query.assert_called_once_with("What is ML?", True, None)
 
     def test_query_default_use_hyde_is_none(
         self, client: TestClient, mock_pipeline: MagicMock
     ) -> None:
         client.post("/query", json={"question": "What is ML?"})
-        mock_pipeline.query.assert_called_once_with("What is ML?", None)
+        mock_pipeline.query.assert_called_once_with("What is ML?", None, None)
+
+    def test_query_passes_top_k_to_pipeline(
+        self, client: TestClient, mock_pipeline: MagicMock
+    ) -> None:
+        r = client.post(
+            "/query", json={"question": "What is ML?", "use_hyde": False, "top_k": 3}
+        )
+        assert r.status_code == 200
+        mock_pipeline.query.assert_called_once_with("What is ML?", False, 3)
+
+    def test_query_rejects_top_k_below_min(self, client: TestClient) -> None:
+        r = client.post("/query", json={"question": "What is ML?", "top_k": 0})
+        assert r.status_code == 422
+
+    def test_query_rejects_top_k_above_max(self, client: TestClient) -> None:
+        r = client.post("/query", json={"question": "What is ML?", "top_k": 21})
+        assert r.status_code == 422
 
 
 class TestMiddleware:
