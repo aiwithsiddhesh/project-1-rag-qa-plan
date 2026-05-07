@@ -6,7 +6,7 @@ from sentence_transformers import CrossEncoder
 class CrossEncoderReranker:
     def __init__(self, model_name: str) -> None:
         logger.info("Loading CrossEncoder: {model}", model=model_name)
-        self._model = CrossEncoder(model_name)
+        self._model = CrossEncoder(model_name, device="cpu")
 
     def rerank(
         self,

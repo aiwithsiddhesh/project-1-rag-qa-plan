@@ -26,6 +26,8 @@ class HybridRetriever:
         chunks: list[Document],
         settings: Settings,
     ) -> None:
+        if not chunks:
+            raise RetrievalError("Cannot initialize HybridRetriever with empty chunks")
         self._vectorstore = vectorstore
         self._chunks = chunks
         self._settings = settings

@@ -51,6 +51,16 @@ class TestTokenize:
         assert tokens == ["end"]
 
 
+class TestHybridRetrieverInit:
+    def test_empty_chunks_raises_retrieval_error(
+        self,
+        mock_vectorstore: MagicMock,
+        settings: Settings,
+    ) -> None:
+        with pytest.raises(RetrievalError, match="empty chunks"):
+            HybridRetriever(mock_vectorstore, [], settings)
+
+
 class TestDenseRetrieval:
     def test_returns_doc_float_tuples(
         self,
