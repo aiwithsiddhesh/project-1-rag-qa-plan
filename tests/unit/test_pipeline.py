@@ -154,14 +154,15 @@ class TestRAGPipelineQuery:
         result = pipeline.query("What is the topic?")
         assert result["answer"] == "Test answer."
 
-    def test_query_num_chunks_retrieved_equals_top_k(
-        self, pipeline_settings, mock_vs, mock_reranker, mock_retriever, mock_llm
+    def test_query_num_chunks_retrieved_equals_len_candidates(
+        self, pipeline_settings, mock_vs, mock_reranker, mock_retriever, mock_llm, pipeline_docs
     ):
         pipeline = make_pipeline(
             pipeline_settings, mock_vs, mock_reranker, mock_retriever, mock_llm
         )
         result = pipeline.query("What is the topic?")
-        assert result["num_chunks_retrieved"] == pipeline_settings.top_k_results
+        # num_chunks_retrieved reflects the retrieval phase (pre-rerank) candidate count
+        assert result["num_chunks_retrieved"] == len(pipeline_docs)
 
     def test_query_calls_reranker_with_candidates(
         self, pipeline_settings, mock_vs, mock_reranker, mock_retriever, mock_llm

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from langchain_community.vectorstores import FAISS
 from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
 from loguru import logger
@@ -12,15 +13,11 @@ from src.retriever import HybridRetriever
 from src.utils import timer_context
 
 
-def _extract_chunks(vectorstore: object) -> list[Document]:
+def _extract_chunks(vectorstore: FAISS) -> list[Document]:
     """Extract all Documents from a FAISS vectorstore via its public docstore API."""
     chunks: list[Document] = []
-    index_to_id = getattr(vectorstore, "index_to_docstore_id", {})
-    docstore = getattr(vectorstore, "docstore", None)
-    if docstore is None:
-        return chunks
-    for doc_id in index_to_id.values():
-        doc = docstore.search(doc_id)
+    for doc_id in vectorstore.index_to_docstore_id.values():
+        doc = vectorstore.docstore.search(doc_id)
         if isinstance(doc, Document):
             chunks.append(doc)
     return chunks
@@ -75,7 +72,7 @@ class RAGPipeline:
         return {
             "answer": answer,
             "sources": sources,
-            "num_chunks_retrieved": len(reranked),
+            "num_chunks_retrieved": len(candidates),
             "retrieval_scores": [],
         }
 
