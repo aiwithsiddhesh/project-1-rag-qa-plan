@@ -197,6 +197,20 @@ class TestRAGPipelineQuery:
         )
         assert call_args[1]["k"] == expected_k
 
+    def test_query_top_k_param_overrides_settings_for_retrieval_and_rerank(
+        self, pipeline_settings, mock_vs, mock_reranker, mock_retriever, mock_llm
+    ):
+        pipeline = make_pipeline(
+            pipeline_settings, mock_vs, mock_reranker, mock_retriever, mock_llm
+        )
+        pipeline.query("What is the topic?", top_k=1)
+
+        retrieve_call = mock_retriever.retrieve_hybrid.call_args
+        assert retrieve_call[1]["k"] == pipeline_settings.fetch_k_multiplier
+
+        rerank_call = mock_reranker.rerank.call_args
+        assert rerank_call[1]["top_n"] == 1
+
     def test_query_too_short_raises_value_error(
         self, pipeline_settings, mock_vs, mock_reranker, mock_retriever, mock_llm
     ):
@@ -214,6 +228,24 @@ class TestRAGPipelineQuery:
         )
         with pytest.raises(ValueError, match="at most 2000"):
             pipeline.query("x" * 2001)
+
+    def test_query_top_k_below_min_raises_value_error(
+        self, pipeline_settings, mock_vs, mock_reranker, mock_retriever, mock_llm
+    ):
+        pipeline = make_pipeline(
+            pipeline_settings, mock_vs, mock_reranker, mock_retriever, mock_llm
+        )
+        with pytest.raises(ValueError, match="between 1 and 20"):
+            pipeline.query("What is the topic?", top_k=0)
+
+    def test_query_top_k_above_max_raises_value_error(
+        self, pipeline_settings, mock_vs, mock_reranker, mock_retriever, mock_llm
+    ):
+        pipeline = make_pipeline(
+            pipeline_settings, mock_vs, mock_reranker, mock_retriever, mock_llm
+        )
+        with pytest.raises(ValueError, match="between 1 and 20"):
+            pipeline.query("What is the topic?", top_k=21)
 
     def test_query_with_hyde_calls_expand_query(
         self, hyde_settings, mock_vs, mock_reranker, mock_retriever, mock_llm

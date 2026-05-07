@@ -35,13 +35,13 @@ Current status: Phase 7 complete — API Layer. Phase 8 (Streamlit UI) next.
 
 **Phase 6 — Pipeline Orchestration**
 - `RAGPipeline` in `src/pipeline.py` — wires all components: loads embedding model → loads vectorstore → extracts chunks → initializes `CrossEncoderReranker` → initializes `HybridRetriever` → initializes `ChatOpenAI`
-- `query(question, use_hyde=None)` — validates length (3–2000 chars), optional HyDE expansion (overridable per-call), hybrid retrieval of `top_k × fetch_k_multiplier` candidates, reranks to `top_k`, builds prompt, calls LLM with retry, extracts citations; wrapped in `timer_context` for latency logging; returns `{"answer", "sources", "num_chunks_retrieved", "retrieval_scores"}`
+- `query(question, use_hyde=None, top_k=None)` — validates length (3–2000 chars), optional HyDE expansion (overridable per-call), optional per-query `top_k` override (1–20), hybrid retrieval of `top_k × fetch_k_multiplier` candidates, reranks to `top_k`, builds prompt, calls LLM with retry, extracts citations; wrapped in `timer_context` for latency logging; returns `{"answer", "sources", "num_chunks_retrieved", "retrieval_scores"}`
 - `is_ready()` — returns `True` when vectorstore loaded; used by the `/readiness` endpoint
 
 **Phase 7 — API Layer**
-- `api/schemas.py` — `QueryRequest` (question 3–2000 chars, `use_hyde: bool`), `QueryResponse`, `HealthResponse`, `ErrorResponse`
+- `api/schemas.py` — `QueryRequest` (question 3–2000 chars, `use_hyde: bool`, optional `top_k` 1–20), `QueryResponse`, `HealthResponse`, `ErrorResponse`
 - `api/middleware.py` — `RequestLoggingMiddleware` (JSON logs: request_id, method, path, status, latency_ms, question_preview, num_chunks_retrieved; injects `X-Request-ID` UUID response header), `setup_cors`, `limiter` (slowapi, 60 req/min on `/query`)
-- `api/main.py` — FastAPI app with lifespan (startup builds `RAGPipeline`, shutdown clears it); `POST /query` (async via `asyncio.to_thread`, maps `RAGException` subclasses to HTTP 503/504/422); `GET /health` (liveness, always 200); `GET /readiness` (503 if pipeline not ready — Kubernetes uses this before routing traffic); `GET /metrics` (Prometheus via `prometheus-fastapi-instrumentator`)
+- `api/main.py` — FastAPI app with lifespan (startup builds `RAGPipeline`, shutdown clears it); `POST /query` (async via `asyncio.to_thread`, supports per-query `use_hyde` and `top_k`, maps `RAGException` subclasses to HTTP 503/504/422); `GET /health` (liveness, always 200); `GET /readiness` (503 if pipeline not ready — Kubernetes uses this before routing traffic); `GET /metrics` (Prometheus via `prometheus-fastapi-instrumentator`)
 
 ## Tests
 
@@ -51,8 +51,8 @@ Current status: Phase 7 complete — API Layer. Phase 8 (Streamlit UI) next.
 - `tests/unit/test_retriever.py` — tests covering dense/BM25/hybrid retrieval, RRF ordering, deduplication, and HyDE fallback
 - `tests/unit/test_reranker.py` — tests covering relevance ordering, top_n, CrossEncoder failure fallback
 - `tests/unit/test_generator.py` — tests covering prompt construction, source headers, context budget truncation, tenacity retry behaviour, GenerationTimeoutError, GenerationError, and citation extraction
-- `tests/unit/test_pipeline.py` — tests covering RAGPipeline init wiring, is_ready, query happy path, HyDE toggle (settings and per-call override), question length validation, reranker call, and retrieval candidate count
-- `tests/integration/test_api_integration.py` — integration tests covering /health, /readiness (200 and 503), POST /query (200, 422 for short/long input, 503 when not ready), X-Request-ID header, use_hyde passthrough, and rate-limit 429
+- `tests/unit/test_pipeline.py` — tests covering RAGPipeline init wiring, is_ready, query happy path, HyDE toggle (settings and per-call override), `top_k` override, question length validation, reranker call, and retrieval candidate count
+- `tests/integration/test_api_integration.py` — integration tests covering /health, /readiness (200 and 503), POST /query (200, 422 for short/long input and invalid `top_k`, 503 when not ready), X-Request-ID header, use_hyde/top_k passthrough, and rate-limit 429
 - `tests/conftest.py` — shared fixtures (sample TXT/PDF/DOCX, empty dir, `sample_chunks`, `mock_embedding_model`, `mock_vectorstore`, `mock_llm`)
 
 Run tests:

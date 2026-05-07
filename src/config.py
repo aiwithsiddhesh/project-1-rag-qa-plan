@@ -4,6 +4,10 @@ from pydantic import Field, SecretStr, ValidationInfo, field_validator, model_va
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+TOP_K_MIN = 1
+TOP_K_MAX = 20
+
+
 class Settings(BaseSettings):
     """Application configuration loaded from environment variables."""
 

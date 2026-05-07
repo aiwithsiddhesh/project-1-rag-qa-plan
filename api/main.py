@@ -102,7 +102,9 @@ async def query_endpoint(request: Request, body: QueryRequest) -> QueryResponse:
     request.state.question_preview = body.question[:50]
 
     try:
-        result = await asyncio.to_thread(_pipeline.query, body.question, body.use_hyde)
+        result = await asyncio.to_thread(
+            _pipeline.query, body.question, body.use_hyde, body.top_k
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RAGException as exc:
