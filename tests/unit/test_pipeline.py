@@ -155,7 +155,13 @@ class TestRAGPipelineQuery:
         assert result["answer"] == "Test answer."
 
     def test_query_num_chunks_retrieved_equals_len_candidates(
-        self, pipeline_settings, mock_vs, mock_reranker, mock_retriever, mock_llm, pipeline_docs
+        self,
+        pipeline_settings,
+        mock_vs,
+        mock_reranker,
+        mock_retriever,
+        mock_llm,
+        pipeline_docs,
     ):
         pipeline = make_pipeline(
             pipeline_settings, mock_vs, mock_reranker, mock_retriever, mock_llm
