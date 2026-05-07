@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     chunk_overlap: int = 50
     top_k_results: int = Field(default=5, gt=0)
     fetch_k_multiplier: int = Field(default=4, gt=0)
+    mmr_lambda: float = Field(default=0.7, ge=0.0, le=1.0)
     bm25_weight: float = 0.4
     dense_weight: float = 0.6
     use_hyde: bool = False

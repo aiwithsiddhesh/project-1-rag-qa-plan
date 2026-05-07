@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -5,6 +6,11 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 from langchain_core.documents import Document
+from langchain_core.messages import AIMessage
+
+# Prevent the src.config module-level Settings() singleton from crashing on import
+# when OPENAI_API_KEY is not present in the local environment.
+os.environ.setdefault("OPENAI_API_KEY", "test-api-key")
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -93,6 +99,13 @@ def mock_embedding_model() -> MagicMock:
     model.embed_documents.side_effect = lambda texts: [vector for _ in texts]
     model.embed_query.return_value = vector
     return model
+
+
+@pytest.fixture
+def mock_llm() -> MagicMock:
+    llm = MagicMock()
+    llm.invoke.return_value = AIMessage(content="This is a mock hypothetical answer.")
+    return llm
 
 
 @pytest.fixture
