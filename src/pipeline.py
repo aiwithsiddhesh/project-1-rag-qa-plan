@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from langchain_core.documents import Document
 from langchain_openai import ChatOpenAI
 from loguru import logger
 
@@ -11,6 +12,20 @@ from src.retriever import HybridRetriever
 from src.utils import timer_context
 
 
+def _extract_chunks(vectorstore: object) -> list[Document]:
+    """Extract all Documents from a FAISS vectorstore via its public docstore API."""
+    chunks: list[Document] = []
+    index_to_id = getattr(vectorstore, "index_to_docstore_id", {})
+    docstore = getattr(vectorstore, "docstore", None)
+    if docstore is None:
+        return chunks
+    for doc_id in index_to_id.values():
+        doc = docstore.search(doc_id)
+        if isinstance(doc, Document):
+            chunks.append(doc)
+    return chunks
+
+
 class RAGPipeline:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
@@ -19,13 +34,13 @@ class RAGPipeline:
 
         embedding_model = get_embedding_model(settings.embedding_model)
         vectorstore = load_vectorstore(settings.vector_store_path, embedding_model)
-        chunks = list(vectorstore.docstore._dict.values())
+        chunks = _extract_chunks(vectorstore)
 
         self._reranker = CrossEncoderReranker(settings.reranker_model)
         self._retriever = HybridRetriever(vectorstore, chunks, settings)
         self._llm = ChatOpenAI(
             model=settings.openai_model,
-            api_key=settings.openai_api_key.get_secret_value(),
+            api_key=settings.openai_api_key,  # type: ignore[arg-type]  # pydantic v1/v2 compat
         )
 
         self._ready = True

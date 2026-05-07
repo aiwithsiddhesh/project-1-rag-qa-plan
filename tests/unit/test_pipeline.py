@@ -47,7 +47,9 @@ def hyde_settings() -> Settings:
 @pytest.fixture
 def mock_vs(pipeline_docs: list[Document]) -> MagicMock:
     store = MagicMock()
-    store.docstore._dict = {str(i): doc for i, doc in enumerate(pipeline_docs)}
+    store.index_to_docstore_id = {i: str(i) for i in range(len(pipeline_docs))}
+    doc_map = {str(i): doc for i, doc in enumerate(pipeline_docs)}
+    store.docstore.search.side_effect = lambda doc_id: doc_map.get(doc_id)
     return store
 
 
