@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 
 class QueryRequest(BaseModel):
     question: str = Field(..., min_length=3, max_length=2000)
-    use_hyde: bool = False
+    use_hyde: bool | None = None
 
 
 class QueryResponse(BaseModel):

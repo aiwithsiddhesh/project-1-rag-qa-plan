@@ -1,4 +1,5 @@
 """Integration tests for the FastAPI API layer (Phase 7)."""
+
 from __future__ import annotations
 
 from unittest.mock import MagicMock
@@ -71,9 +72,7 @@ class TestReadinessEndpoint:
 
 
 class TestQueryEndpoint:
-    def test_query_returns_200_with_valid_question(
-        self, client: TestClient
-    ) -> None:
+    def test_query_returns_200_with_valid_question(self, client: TestClient) -> None:
         r = client.post("/query", json={"question": "What is machine learning?"})
         assert r.status_code == 200
         body = r.json()
@@ -82,15 +81,11 @@ class TestQueryEndpoint:
         assert "num_chunks_retrieved" in body
         assert "retrieval_scores" in body
 
-    def test_query_returns_422_for_question_too_short(
-        self, client: TestClient
-    ) -> None:
+    def test_query_returns_422_for_question_too_short(self, client: TestClient) -> None:
         r = client.post("/query", json={"question": "hi"})
         assert r.status_code == 422
 
-    def test_query_returns_422_for_question_too_long(
-        self, client: TestClient
-    ) -> None:
+    def test_query_returns_422_for_question_too_long(self, client: TestClient) -> None:
         r = client.post("/query", json={"question": "x" * 2001})
         assert r.status_code == 422
 
@@ -108,23 +103,19 @@ class TestQueryEndpoint:
         client.post("/query", json={"question": "What is ML?", "use_hyde": True})
         mock_pipeline.query.assert_called_once_with("What is ML?", True)
 
-    def test_query_default_use_hyde_is_false(
+    def test_query_default_use_hyde_is_none(
         self, client: TestClient, mock_pipeline: MagicMock
     ) -> None:
         client.post("/query", json={"question": "What is ML?"})
-        mock_pipeline.query.assert_called_once_with("What is ML?", False)
+        mock_pipeline.query.assert_called_once_with("What is ML?", None)
 
 
 class TestMiddleware:
-    def test_x_request_id_header_present_on_health(
-        self, client: TestClient
-    ) -> None:
+    def test_x_request_id_header_present_on_health(self, client: TestClient) -> None:
         r = client.get("/health")
         assert "x-request-id" in r.headers
 
-    def test_x_request_id_header_present_on_query(
-        self, client: TestClient
-    ) -> None:
+    def test_x_request_id_header_present_on_query(self, client: TestClient) -> None:
         r = client.post("/query", json={"question": "What is machine learning?"})
         assert "x-request-id" in r.headers
 
@@ -139,10 +130,14 @@ class TestRateLimit:
     def test_61st_request_returns_429(self, mock_pipeline: MagicMock) -> None:
         from api.middleware import limiter
 
+        # slowapi.Limiter exposes no public counter-reset API; _storage.reset()
+        # is the only way to clear the in-memory window without recreating the
+        # whole app. Documented as a known exception to the private-attribute
+        # rule — wrapped in try/skip to guard against future library changes.
         try:
             limiter._storage.reset()
         except Exception:
-            pytest.skip("Cannot reset limiter storage — rate limit test skipped")
+            pytest.skip("Cannot reset limiter storage — skipping rate limit test")
 
         with TestClient(app, raise_server_exceptions=False) as c:
             api_main._pipeline = mock_pipeline

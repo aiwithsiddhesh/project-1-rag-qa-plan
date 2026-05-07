@@ -29,7 +29,9 @@ _pipeline: RAGPipeline | None = None
 
 
 async def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
-    return JSONResponse(status_code=429, content={"detail": f"Rate limit exceeded: {exc}"})
+    return JSONResponse(
+        status_code=429, content={"detail": f"Rate limit exceeded: {exc}"}
+    )
 
 
 @asynccontextmanager
