@@ -1,7 +1,10 @@
 import sys
 from pathlib import Path
+from unittest.mock import MagicMock
 
+import numpy as np
 import pytest
+from langchain_core.documents import Document
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -65,3 +68,51 @@ def empty_docs_dir(tmp_path: Path) -> Path:
     docs_dir = tmp_path / "empty"
     docs_dir.mkdir()
     return docs_dir
+
+
+@pytest.fixture
+def sample_chunks() -> list[Document]:
+    return [
+        Document(
+            page_content=f"Sample chunk {i} with content for testing retrieval pipelines.",
+            metadata={
+                "source_file": f"doc_{i % 2}.txt",
+                "file_type": "txt",
+                "chunk_index": i,
+                "total_chunks": 5,
+            },
+        )
+        for i in range(5)
+    ]
+
+
+@pytest.fixture
+def mock_embedding_model() -> MagicMock:
+    model = MagicMock()
+    vector = np.ones(384).tolist()
+    model.embed_documents.side_effect = lambda texts: [vector for _ in texts]
+    model.embed_query.return_value = vector
+    return model
+
+
+@pytest.fixture
+def mock_vectorstore() -> MagicMock:
+    store = MagicMock()
+    fake_docs = [
+        Document(
+            page_content=f"Result chunk {i}",
+            metadata={
+                "source_file": f"result_doc_{i}.txt",
+                "chunk_index": i,
+                "total_chunks": 3,
+            },
+        )
+        for i in range(3)
+    ]
+    store.similarity_search_with_score.return_value = [
+        (doc, 0.9 - i * 0.1) for i, doc in enumerate(fake_docs)
+    ]
+    store.max_marginal_relevance_search_with_score_by_vector.return_value = [
+        (doc, 0.9 - i * 0.1) for i, doc in enumerate(fake_docs)
+    ]
+    return store
