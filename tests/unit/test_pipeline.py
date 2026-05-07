@@ -241,3 +241,30 @@ class TestRAGPipelineQuery:
         )
         result = pipeline.query("What is the topic?")
         assert isinstance(result["retrieval_scores"], list)
+
+    def test_query_use_hyde_param_true_overrides_settings_false(
+        self, pipeline_settings, mock_vs, mock_reranker, mock_retriever, mock_llm
+    ):
+        pipeline = make_pipeline(
+            pipeline_settings, mock_vs, mock_reranker, mock_retriever, mock_llm
+        )
+        pipeline.query("What is the topic?", use_hyde=True)
+        mock_retriever.expand_query_hyde.assert_called_once()
+
+    def test_query_use_hyde_param_false_overrides_settings_true(
+        self, hyde_settings, mock_vs, mock_reranker, mock_retriever, mock_llm
+    ):
+        pipeline = make_pipeline(
+            hyde_settings, mock_vs, mock_reranker, mock_retriever, mock_llm
+        )
+        pipeline.query("What is the topic?", use_hyde=False)
+        mock_retriever.expand_query_hyde.assert_not_called()
+
+    def test_query_use_hyde_param_none_falls_back_to_settings(
+        self, hyde_settings, mock_vs, mock_reranker, mock_retriever, mock_llm
+    ):
+        pipeline = make_pipeline(
+            hyde_settings, mock_vs, mock_reranker, mock_retriever, mock_llm
+        )
+        pipeline.query("What is the topic?", use_hyde=None)
+        mock_retriever.expand_query_hyde.assert_called_once()

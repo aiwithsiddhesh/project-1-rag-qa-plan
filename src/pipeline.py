@@ -43,20 +43,23 @@ class RAGPipeline:
         self._ready = True
         logger.info("RAGPipeline ready")
 
-    def query(self, question: str) -> dict:
+    def query(self, question: str, use_hyde: bool | None = None) -> dict:
         """Run the full RAG pipeline: validate → retrieve → rerank → generate → cite.
 
         Returns dict with keys: answer, sources, num_chunks_retrieved, retrieval_scores.
         Raises ValueError if question length is outside [3, 2000].
+        use_hyde overrides settings.use_hyde when provided.
         """
         if len(question) < 3:
             raise ValueError("Question must be at least 3 characters.")
         if len(question) > 2000:
             raise ValueError("Question must be at most 2000 characters.")
 
+        effective_use_hyde = use_hyde if use_hyde is not None else self._settings.use_hyde
+
         with timer_context("pipeline.query"):
             retrieval_query = question
-            if self._settings.use_hyde:
+            if effective_use_hyde:
                 retrieval_query = self._retriever.expand_query_hyde(question, self._llm)
 
             k = self._settings.top_k_results
