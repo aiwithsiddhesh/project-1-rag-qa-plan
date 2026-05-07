@@ -37,3 +37,8 @@ make test
 | `make ui` | Start Streamlit UI on port 8501 |
 | `make test` | Run unit + integration tests |
 | `make eval` | Run RAGAS evaluation (slow, requires API key) |
+| `make coverage` | Run tests and generate coverage report |
+| `make lint` | Run ruff and mypy checks |
+| `make docker-up` | Start API and UI services via docker-compose |
+| `make docker-down` | Stop docker-compose services |
+| `make clean` | Remove temporary files and caches |
