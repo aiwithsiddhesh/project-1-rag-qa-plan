@@ -12,13 +12,14 @@ from tenacity import (
     wait_exponential,
 )
 
+from src.contracts import NO_CONTEXT_PHRASE
 from src.exceptions import GenerationError, GenerationTimeoutError
 
 _CONTEXT_BUDGET_CHARS = 3000
 _PROMPT_TEMPLATE = (
     "You are a document Q&A assistant. Answer the question using ONLY the context "
     "below. If the answer is not in the context, say "
-    '"I could not find the answer in the provided documents."\n\n'
+    f'"{NO_CONTEXT_PHRASE}"\n\n'
     "Context:\n{context}\n\n"
     "Question: {question}\n\n"
     "Answer:"

@@ -3,9 +3,7 @@ from pathlib import Path
 from pydantic import Field, SecretStr, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
-TOP_K_MIN = 1
-TOP_K_MAX = 20
+from src.contracts import DEFAULT_TOP_K, TOP_K_MAX, TOP_K_MIN
 
 
 class Settings(BaseSettings):
@@ -24,7 +22,7 @@ class Settings(BaseSettings):
     reranker_model: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"
     chunk_size: int = Field(default=500, ge=100, le=2000)
     chunk_overlap: int = 50
-    top_k_results: int = Field(default=5, gt=0)
+    top_k_results: int = Field(default=DEFAULT_TOP_K, ge=TOP_K_MIN, le=TOP_K_MAX)
     fetch_k_multiplier: int = Field(default=4, gt=0)
     mmr_lambda: float = Field(default=0.7, ge=0.0, le=1.0)
     bm25_weight: float = 0.4
