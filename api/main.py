@@ -58,8 +58,6 @@ app.add_middleware(SlowAPIMiddleware)
 app.add_middleware(RequestLoggingMiddleware)
 setup_cors(app, settings.cors_origins)
 
-Instrumentator().instrument(app).expose(app, endpoint="/metrics")
-
 
 def _map_rag_exception(exc: RAGException) -> HTTPException:
     if isinstance(exc, (VectorStoreNotFoundError, VectorStoreError)):
@@ -118,3 +116,6 @@ async def query_endpoint(request: Request, body: QueryRequest) -> QueryResponse:
         num_chunks_retrieved=result["num_chunks_retrieved"],
         retrieval_scores=result["retrieval_scores"],
     )
+
+
+Instrumentator().instrument(app).expose(app, endpoint="/metrics")
