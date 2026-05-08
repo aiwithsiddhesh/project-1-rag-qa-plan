@@ -75,7 +75,7 @@ flowchart TB
 
 | Layer | Main files | Responsibility |
 | --- | --- | --- |
-| Configuration | `src/config.py` | Pydantic settings, validation, model paths, retrieval weights, feature flags |
+| Configuration and contracts | `src/config.py`, `src/contracts.py` | Pydantic settings, validation, model paths, retrieval weights, feature flags, shared API/RAG constants |
 | Exceptions and utilities | `src/exceptions.py`, `src/utils.py` | Typed failure modes, structured logging, safe text truncation, latency timers |
 | Ingestion | `src/ingest.py`, `scripts/run_ingest.py` | Document loading, metadata enrichment, recursive chunking, vectorstore build command |
 | Embeddings and index | `src/embedder.py` | Cached embedding model creation, FAISS build/load, vectorstore error handling |
@@ -85,7 +85,7 @@ flowchart TB
 | Orchestration | `src/pipeline.py` | End-to-end query workflow, readiness state, input validation |
 | API | `api/main.py`, `api/schemas.py`, `api/middleware.py`, `api/observability.py` | HTTP contracts, lifecycle loading, rate limits, request logs, metrics |
 | UI | `app/streamlit_app.py` | Chat interface, API health status, top-k and HyDE controls, source display |
-| Evaluation | `eval/rag_eval.py`, `tests/eval/test_rag_quality.py` | RAGAS dataset execution and slow quality gates |
+| Evaluation | `eval/rag_eval.py`, `scripts/run_evaluation.py`, `tests/eval/test_rag_quality.py` | RAGAS dataset execution, evaluation CLI, and slow quality gates |
 
 ### Architecture Decisions
 
