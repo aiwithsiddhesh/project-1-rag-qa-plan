@@ -2,7 +2,7 @@
 
 This repository is being built phase by phase from `project-1-rag-qa-plan.md`.
 
-Current status: Phase 8 complete — Streamlit UI. Phase 9 (Scripts + RAGAS Eval) next.
+Current status: Phase 9 complete — Scripts + RAGAS Eval. Phase 10 (Full Test Suite) next.
 
 ## Implemented
 
@@ -48,6 +48,11 @@ Current status: Phase 8 complete — Streamlit UI. Phase 9 (Scripts + RAGAS Eval
 - Assistant responses display answer text, collapsed source expander, and query stats footer (`Retrieved N chunks | X.Xs`)
 - UI distinguishes unreachable API errors, API/RAG service errors, and grounded no-context fallback responses
 
+**Phase 9 — Scripts + RAGAS Eval**
+- `scripts/run_ingest.py` — CLI for building the FAISS vectorstore from `data/sample_docs/`; supports `--docs-path`, `--chunk-size`, `--chunk-overlap`, and `--force-rebuild`
+- `eval/rag_eval.py` — helpers to load eval JSON records, run RAGAS metrics (`faithfulness`, `answer_relevancy`, `context_precision`, `context_recall`), and generate a Markdown score report
+- `data/eval_dataset.json` — 10 grounded Q&A records based on the committed NIST sample documents
+
 ## Tests
 
 - `tests/unit/test_foundation.py` — Phase 1 unit tests
@@ -58,6 +63,8 @@ Current status: Phase 8 complete — Streamlit UI. Phase 9 (Scripts + RAGAS Eval
 - `tests/unit/test_generator.py` — tests covering prompt construction, source headers, context budget truncation, tenacity retry behaviour, GenerationTimeoutError, GenerationError, and citation extraction
 - `tests/unit/test_pipeline.py` — tests covering RAGPipeline init wiring, is_ready, query happy path, HyDE toggle (settings and per-call override), `top_k` override, question length validation, reranker call, and retrieval candidate count
 - `tests/unit/test_streamlit_app.py` — tests covering Streamlit API helper behavior, health/readiness handling, API-down errors, `top_k`/HyDE payloads, and no-context detection
+- `tests/unit/test_run_ingest.py` — tests covering ingestion CLI success, RAGException exit handling, and `--force-rebuild` behavior
+- `tests/unit/test_rag_eval.py` — tests covering eval dataset validation, report generation, and RAGAS invocation with mocked dependencies
 - `tests/integration/test_api_integration.py` — integration tests covering /health, /readiness (200 and 503), POST /query (200, 422 for short/long input and invalid `top_k`, 503 when not ready), X-Request-ID header, use_hyde/top_k passthrough, and rate-limit 429
 - `tests/conftest.py` — shared fixtures (sample TXT/PDF/DOCX, empty dir, `sample_chunks`, `mock_embedding_model`, `mock_vectorstore`, `mock_llm`)
 
@@ -72,7 +79,7 @@ make test
 | Command | Description |
 |---------|-------------|
 | `make setup` | Install all dependencies |
-| `make ingest` | Build FAISS vectorstore from `data/sample_docs/` |
+| `make ingest` | Build FAISS vectorstore from `data/sample_docs/`; use `python scripts/run_ingest.py --force-rebuild` to overwrite an existing index |
 | `make serve` | Start FastAPI server on port 8000 |
 | `make ui` | Start Streamlit UI on port 8501 |
 | `make test` | Run unit + integration tests |
