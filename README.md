@@ -1,6 +1,6 @@
 # Document Q&A RAG System
 
-Production-style Retrieval-Augmented Generation (RAG) system for question answering over local documents. The project is built as a senior AI engineering portfolio piece: hybrid retrieval, cross-encoder reranking, optional HyDE query expansion, deterministic tests, RAGAS quality gates, FastAPI serving, Streamlit UI, Prometheus metrics, and optional LangSmith tracing.
+Production-style Retrieval-Augmented Generation (RAG) system for question answering over local documents. The project is built as a senior AI engineering portfolio piece with hybrid retrieval, cross-encoder reranking, optional HyDE query expansion, deterministic tests, RAGAS quality gates, FastAPI serving, Streamlit UI, Prometheus metrics, and optional LangSmith tracing.
 
 The committed sample corpus contains three NIST PDFs:
 
@@ -8,33 +8,96 @@ The committed sample corpus contains three NIST PDFs:
 - NIST Generative AI Profile
 - NIST Zero Trust Architecture
 
+## Demo
+
+Demo video location: `docs/assets/demo.mp4`
+
+Add the recorded walkthrough at that path before publishing the repository. The demo should show the full local workflow: ingesting the sample NIST documents, starting the FastAPI service, checking readiness, asking a grounded question through the API or Streamlit UI, and inspecting returned source citations.
+
 ## Architecture
 
+This repository separates the RAG system into explicit layers so each concern can be tested, replaced, and explained independently:
+
+- **Ingestion layer** loads PDFs, DOCX files, and text files, then creates citation-friendly chunks with source metadata.
+- **Indexing layer** builds a local FAISS vector store from normalized SentenceTransformer embeddings.
+- **Retrieval layer** combines dense vector search with BM25 keyword search, then fuses ranked results with Reciprocal Rank Fusion.
+- **Reranking layer** applies a CrossEncoder to the retrieved candidate set before prompt construction.
+- **Generation layer** builds a grounded prompt, calls the chat model with retry handling, and extracts source citations.
+- **Serving layer** exposes the pipeline through FastAPI endpoints, readiness checks, structured request logs, metrics, and a Streamlit chat UI.
+
 ```mermaid
-flowchart LR
-    docs[PDF / DOCX / TXT documents] --> ingest[Document loaders]
-    ingest --> chunk[Recursive chunking<br/>metadata + citations]
-    chunk --> embed[SentenceTransformer embeddings]
-    embed --> faiss[FAISS vector store]
-    chunk --> bm25[BM25 sparse index]
+flowchart TB
+    subgraph Offline["Offline indexing path"]
+        docs["Local documents<br/>PDF / DOCX / TXT"] --> loaders["Document loaders<br/>src/ingest.py"]
+        loaders --> chunks["Recursive chunks<br/>source metadata + chunk indexes"]
+        chunks --> embeddings["SentenceTransformer embeddings<br/>normalized vectors"]
+        embeddings --> faiss["FAISS vector store<br/>data/vectorstore"]
+    end
 
-    question[User question] --> api[FastAPI /query]
-    api --> hyde{HyDE enabled?}
-    hyde -- no --> retrieve[Hybrid retrieval]
-    hyde -- yes --> llm_hyde[LLM hypothetical answer]
-    llm_hyde --> retrieve
-    faiss --> retrieve
-    bm25 --> retrieve
-    retrieve --> rrf[Reciprocal Rank Fusion]
-    rrf --> rerank[CrossEncoder reranker]
-    rerank --> prompt[Grounded prompt builder]
-    prompt --> llm[ChatOpenAI]
-    llm --> answer[Answer + source citations]
+    subgraph Runtime["Online query path"]
+        client["API client or Streamlit UI"] --> api["FastAPI<br/>api/main.py"]
+        api --> pipeline["RAGPipeline<br/>src/pipeline.py"]
+        pipeline --> hyde{"HyDE enabled?"}
+        hyde -- "yes" --> query_expansion["Hypothetical answer<br/>LLM query expansion"]
+        hyde -- "no" --> hybrid
+        query_expansion --> hybrid["HybridRetriever<br/>dense + BM25"]
+        faiss --> hybrid
+        chunks --> bm25["BM25 sparse index"]
+        bm25 --> hybrid
+        hybrid --> rrf["Reciprocal Rank Fusion<br/>dedupe + rank merge"]
+        rrf --> reranker["CrossEncoder reranker"]
+        reranker --> prompt["Grounded prompt builder<br/>context budget + citations"]
+        prompt --> llm["ChatOpenAI<br/>retry on rate limits"]
+        llm --> response["Answer<br/>sources + retrieval metadata"]
+        response --> client
+    end
 
-    api --> metrics[Prometheus /metrics]
-    api --> logs[Structured request logs]
-    llm -. optional .-> langsmith[LangSmith traces]
+    subgraph Ops["Operational surface"]
+        api --> health["/health"]
+        api --> readiness["/readiness"]
+        api --> metrics["/metrics"]
+        api --> logs["structured request logs"]
+        llm -. optional .-> langsmith["LangSmith traces"]
+    end
 ```
+
+### Runtime Request Flow
+
+1. A user submits a question through `POST /query` or the Streamlit chat UI.
+2. FastAPI validates the request with Pydantic and sends synchronous RAG work to a worker thread so the event loop is not blocked.
+3. `RAGPipeline` optionally expands the query with HyDE when enabled.
+4. `HybridRetriever` retrieves candidates from both FAISS and BM25, merges them with Reciprocal Rank Fusion, and removes duplicates.
+5. The CrossEncoder reranker scores query-document pairs and keeps the highest-quality context chunks.
+6. The generator formats a grounded prompt with source labels and calls the configured OpenAI chat model with retry handling.
+7. The response returns the answer, cited source filenames, the number of chunks retrieved, and retrieval metadata.
+
+### Component Map
+
+| Layer | Main files | Responsibility |
+| --- | --- | --- |
+| Configuration and contracts | `src/config.py`, `src/contracts.py` | Pydantic settings, validation, model paths, retrieval weights, feature flags, shared API/RAG constants |
+| Exceptions and utilities | `src/exceptions.py`, `src/utils.py` | Typed failure modes, structured logging, safe text truncation, latency timers |
+| Ingestion | `src/ingest.py`, `scripts/run_ingest.py` | Document loading, metadata enrichment, recursive chunking, vectorstore build command |
+| Embeddings and index | `src/embedder.py` | Cached embedding model creation, FAISS build/load, vectorstore error handling |
+| Retrieval | `src/retriever.py` | Dense retrieval, BM25 retrieval, RRF fusion, HyDE query expansion support |
+| Reranking | `src/reranker.py` | CrossEncoder scoring with graceful fallback on model failure |
+| Generation | `src/generator.py` | Context formatting, prompt construction, LLM retry policy, citation extraction |
+| Orchestration | `src/pipeline.py` | End-to-end query workflow, readiness state, input validation |
+| API | `api/main.py`, `api/schemas.py`, `api/middleware.py`, `api/observability.py` | HTTP contracts, lifecycle loading, rate limits, request logs, metrics |
+| UI | `app/streamlit_app.py` | Chat interface, API health status, top-k and HyDE controls, source display |
+| Evaluation | `eval/rag_eval.py`, `scripts/run_evaluation.py`, `tests/eval/test_rag_quality.py` | RAGAS dataset execution, evaluation CLI, and slow quality gates |
+
+### Architecture Decisions
+
+| Decision | Reason |
+| --- | --- |
+| Local FAISS vector store | Keeps the project easy to run locally while still demonstrating vector search design. |
+| Hybrid retrieval | Dense search handles semantic similarity; BM25 preserves exact terms, acronyms, and framework names common in technical documents. |
+| Reciprocal Rank Fusion | Merges dense and sparse rankings without depending on incompatible raw score scales. |
+| Retrieve wide, rerank narrow | Fast retrievers collect candidates; the CrossEncoder spends compute only on the smaller candidate set used for generation. |
+| Grounded prompt with source metadata | Makes citations traceable to original files and chunk positions. |
+| Separate liveness and readiness | `/health` confirms the process is alive; `/readiness` confirms the vectorstore-backed pipeline can accept traffic. |
+| Slow eval tests | Keeps default CI deterministic and free of paid calls while preserving an on-demand RAG quality gate. |
 
 ## Tech Stack
 
