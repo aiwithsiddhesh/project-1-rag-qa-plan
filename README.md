@@ -1,109 +1,298 @@
 # Document Q&A RAG System
 
-This repository is being built phase by phase from `project-1-rag-qa-plan.md`.
+Production-style Retrieval-Augmented Generation (RAG) system for question answering over local documents. The project is built as a senior AI engineering portfolio piece: hybrid retrieval, cross-encoder reranking, optional HyDE query expansion, deterministic tests, RAGAS quality gates, FastAPI serving, Streamlit UI, Prometheus metrics, and optional LangSmith tracing.
 
-Current status: Phase 12 complete — Exploration Notebook. Phase 13 (README) next.
+The committed sample corpus contains three NIST PDFs:
 
-## Implemented
+- NIST AI Risk Management Framework
+- NIST Generative AI Profile
+- NIST Zero Trust Architecture
 
-**Phase 1 — Foundation**
-- Pydantic settings with validators in `src/config.py`
-- RAG exception hierarchy (`DocumentLoadError`, `VectorStoreNotFoundError`, etc.) in `src/exceptions.py`
-- Logging (`setup_logging`), text truncation, and `timer_context` in `src/utils.py`
+## Architecture
 
-**Phase 2 — Ingestion Layer**
-- `load_documents(docs_path)` in `src/ingest.py` — loads PDF/DOCX/TXT with metadata (`source_file`, `file_type`, `file_size_bytes`, `ingested_at`)
-- `chunk_documents(docs, chunk_size, chunk_overlap)` — `RecursiveCharacterTextSplitter` with `chunk_index` / `total_chunks` metadata
+```mermaid
+flowchart LR
+    docs[PDF / DOCX / TXT documents] --> ingest[Document loaders]
+    ingest --> chunk[Recursive chunking<br/>metadata + citations]
+    chunk --> embed[SentenceTransformer embeddings]
+    embed --> faiss[FAISS vector store]
+    chunk --> bm25[BM25 sparse index]
 
-**Phase 3 — Embedding + Vector Store**
-- `get_embedding_model(model_name)` in `src/embedder.py` — loads `HuggingFaceEmbeddings` with `normalize_embeddings=True`; module-level cache prevents repeated loading
-- `build_vectorstore(chunks, embedding_model, save_path)` — builds FAISS index from chunks, creates parent dirs, persists to disk
-- `load_vectorstore(save_path, embedding_model)` — loads persisted index; raises `VectorStoreNotFoundError` (with "Run `make ingest` first" hint) if missing, `VectorStoreCorruptError` on deserialization failure
+    question[User question] --> api[FastAPI /query]
+    api --> hyde{HyDE enabled?}
+    hyde -- no --> retrieve[Hybrid retrieval]
+    hyde -- yes --> llm_hyde[LLM hypothetical answer]
+    llm_hyde --> retrieve
+    faiss --> retrieve
+    bm25 --> retrieve
+    retrieve --> rrf[Reciprocal Rank Fusion]
+    rrf --> rerank[CrossEncoder reranker]
+    rerank --> prompt[Grounded prompt builder]
+    prompt --> llm[ChatOpenAI]
+    llm --> answer[Answer + source citations]
 
-**Phase 4 — Advanced Retrieval**
-- `HybridRetriever` in `src/retriever.py` — BM25 + dense MMR retrieval fused via Reciprocal Rank Fusion (RRF k=60); deduplicates by `page_content`; configurable `mmr_lambda` (default 0.7)
-- `retrieve_dense(query, k, fetch_k)` — FAISS MMR search; `lambda_mult` from `settings.mmr_lambda`
-- `retrieve_bm25(query, k)` — BM25Okapi over all chunks; tokenization consistent at index and query time via shared `_tokenize` helper
-- `retrieve_hybrid(query, k)` — fuses both retrieval paths with RRF; docs appearing in both lists rank higher than docs in one
-- `expand_query_hyde(query, llm)` — generates a hypothetical answer to close the query-document distribution gap; falls back to original query on failure
-- `CrossEncoderReranker` in `src/reranker.py` — batch `CrossEncoder.predict` on `(query, doc)` pairs; sorted descending; falls back to original order with logged warning on failure
-
-**Phase 5 — Generation**
-- `build_prompt(question, context_chunks)` in `src/generator.py` — formats each chunk as `[Source: {source_file}, chunk {chunk_index}]`, applies a 3000-char context budget (truncates from the end so most-relevant chunks are preserved), embeds in a hardcoded grounded-answer template
-- `call_llm_with_retry(prompt, llm)` — tenacity retry with `stop_after_attempt(3)` and `wait_exponential(min=1, max=10)` on `openai.RateLimitError`; raises `GenerationTimeoutError` after retries are exhausted; raises `GenerationError` for all other failures
-- `extract_citations(answer, source_documents)` — returns unique `source_file` names whose filename appears as a substring in the answer text
-
-**Phase 6 — Pipeline Orchestration**
-- `RAGPipeline` in `src/pipeline.py` — wires all components: loads embedding model → loads vectorstore → extracts chunks → initializes `CrossEncoderReranker` → initializes `HybridRetriever` → initializes `ChatOpenAI`
-- `query(question, use_hyde=None, top_k=None)` — validates length (3–2000 chars), optional HyDE expansion (overridable per-call), optional per-query `top_k` override (1–20), hybrid retrieval of `top_k × fetch_k_multiplier` candidates, reranks to `top_k`, builds prompt, calls LLM with retry, extracts citations; wrapped in `timer_context` for latency logging; returns `{"answer", "sources", "num_chunks_retrieved", "retrieval_scores", "contexts", "retrieval_strategy"}`
-- `is_ready()` — returns `True` when vectorstore loaded; used by the `/readiness` endpoint
-
-**Phase 7 — API Layer**
-- `api/schemas.py` — `QueryRequest` (question 3–2000 chars, `use_hyde: bool`, optional `top_k` 1–20), `QueryResponse`, `HealthResponse`, `ErrorResponse`
-- `api/middleware.py` — `RequestLoggingMiddleware` (JSON logs: request_id, method, path, status, latency_ms, question_preview, num_chunks_retrieved, retrieval_strategy; injects `X-Request-ID` UUID response header), `setup_cors`, `limiter` (slowapi, 60 req/min on `/query`)
-- `api/main.py` — FastAPI app with lifespan (startup builds `RAGPipeline`, shutdown clears it); `POST /query` (async via `asyncio.to_thread`, supports per-query `use_hyde` and `top_k`, maps `RAGException` subclasses to HTTP 503/504/422); `GET /health` (liveness, always 200); `GET /readiness` (503 if pipeline not ready — Kubernetes uses this before routing traffic); `GET /metrics` (Prometheus via `prometheus-fastapi-instrumentator` plus RAG custom counters)
-
-**Phase 8 — Streamlit UI**
-- `app/streamlit_app.py` — chat UI backed by the FastAPI service; sidebar controls for API URL, API health/readiness, `top_k`, and HyDE
-- Assistant responses display answer text, collapsed source expander, and query stats footer (`Retrieved N chunks | X.Xs`)
-- UI distinguishes unreachable API errors, API/RAG service errors, and grounded no-context fallback responses
-
-**Phase 9 — Scripts + RAGAS Eval**
-- `scripts/run_ingest.py` — CLI for building the FAISS vectorstore from `data/sample_docs/`; supports `--docs-path`, `--chunk-size`, `--chunk-overlap`, and `--force-rebuild`
-- `eval/rag_eval.py` — helpers to load eval JSON records, run RAGAS metrics (`faithfulness`, `answer_relevancy`, `context_precision`, `context_recall`), and generate a Markdown score report
-- `data/eval_dataset.json` — 10 grounded Q&A records based on the committed NIST sample documents
-
-**Phase 10 — Full Test Suite**
-- `tests/integration/test_pipeline_integration.py` — local FAISS + deterministic embedding integration tests with mocked LLM and reranker
-- `tests/eval/test_rag_quality.py` — slow/on-demand eval quality checks for metric thresholds, adversarial prompt injection, and out-of-domain fallback behavior
-- `pytest.ini` — registers the `slow` marker so default tests stay clean and eval tests remain opt-in
-
-**Phase 11 — Observability**
-- `api/observability.py` — LangSmith tracing setup and Prometheus custom counters
-- LangSmith tracing auto-enables when `LANGSMITH_API_KEY` is configured; explicit `LANGSMITH_TRACING=true` without a key logs a warning and keeps tracing disabled
-- `/metrics` exposes `rag_chunks_retrieved_total` and `rag_empty_context_total`
-- Request logs include `retrieval_strategy` (`hybrid` or `hybrid+hyde`) alongside request and retrieval metadata
-
-**Phase 12 — Exploration Notebook**
-- `notebooks/01_rag_exploration.ipynb` — portfolio notebook covering sample document metadata, chunk-size length distributions, UMAP embedding projection, dense/BM25/hybrid retrieval comparison, reranking impact, HyDE-style retrieval comparison, and a RAGAS threshold table
-- The notebook defaults to local-only exploration; heavyweight reranker and real RAGAS/LLM calls are opt-in via notebook flags
-
-## Tests
-
-- `tests/unit/test_foundation.py` — Phase 1 unit tests
-- `tests/unit/test_ingest.py` — 17 tests covering load, chunking, metadata, and error cases
-- `tests/unit/test_embedder.py` — 13 tests covering model caching, build, and load error paths
-- `tests/unit/test_retriever.py` — tests covering dense/BM25/hybrid retrieval, RRF ordering, deduplication, and HyDE fallback
-- `tests/unit/test_reranker.py` — tests covering relevance ordering, top_n, CrossEncoder failure fallback
-- `tests/unit/test_generator.py` — tests covering prompt construction, source headers, context budget truncation, tenacity retry behaviour, GenerationTimeoutError, GenerationError, and citation extraction
-- `tests/unit/test_pipeline.py` — tests covering RAGPipeline init wiring, is_ready, query happy path, HyDE toggle (settings and per-call override), `top_k` override, question length validation, reranker call, and retrieval candidate count
-- `tests/unit/test_streamlit_app.py` — tests covering Streamlit API helper behavior, health/readiness handling, API-down errors, `top_k`/HyDE payloads, and no-context detection
-- `tests/unit/test_run_ingest.py` — tests covering ingestion CLI success, RAGException exit handling, and `--force-rebuild` behavior
-- `tests/unit/test_rag_eval.py` — tests covering eval dataset validation, report generation, and RAGAS invocation with mocked dependencies
-- `tests/unit/test_observability.py` — tests covering LangSmith tracing enable/disable behavior without real keys
-- `tests/integration/test_pipeline_integration.py` — integration tests covering full pipeline response shape, relevant retrieval, no-context fallback, and 600-char question handling with local FAISS and mocked paid components
-- `tests/integration/test_api_integration.py` — integration tests covering /health, /readiness (200 and 503), POST /query (200, 422 for short/long input and invalid `top_k`, 503 when not ready), X-Request-ID header, use_hyde/top_k passthrough, and rate-limit 429
-- `tests/eval/test_rag_quality.py` — `@pytest.mark.slow` eval tests for RAGAS-style thresholds, prompt-injection behavior, and out-of-domain fallback
-- `tests/conftest.py` — shared fixtures (sample TXT/PDF/DOCX, empty dir, `sample_chunks`, `mock_embedding_model`, `mock_vectorstore`, `mock_llm`)
-
-Run tests:
-
+    api --> metrics[Prometheus /metrics]
+    api --> logs[Structured request logs]
+    llm -. optional .-> langsmith[LangSmith traces]
 ```
+
+## Tech Stack
+
+| Area | Technology | Why |
+| --- | --- | --- |
+| API | FastAPI, Pydantic | Typed request/response contracts, validation at the boundary, async endpoint wrappers around sync RAG work |
+| UI | Streamlit | Fast interactive chat UI with health checks, source expanders, top-k control, and HyDE toggle |
+| Loading | LangChain community loaders, PyMuPDF, docx2txt | Practical support for PDF, DOCX, and TXT documents |
+| Chunking | RecursiveCharacterTextSplitter | Stable chunks with configurable size/overlap and source metadata for citations |
+| Dense retrieval | SentenceTransformers + FAISS | Local embeddings and exact vector search suitable for the small committed corpus |
+| Sparse retrieval | rank-bm25 | Captures exact terms and acronyms that dense retrieval can miss |
+| Fusion | Reciprocal Rank Fusion | Combines dense and sparse ranks without calibrating incompatible score scales |
+| Reranking | sentence-transformers CrossEncoder | Improves final context ordering by scoring query/document pairs jointly |
+| Generation | ChatOpenAI + tenacity | Grounded answer generation with retry handling for rate-limit failures |
+| Evaluation | RAGAS, pytest slow tests | On-demand quality gates for faithfulness, answer relevancy, context precision, and recall |
+| Observability | Prometheus, loguru, LangSmith | Metrics, structured request logs, and optional LLM tracing |
+| Quality | pytest, ruff, mypy, GitHub Actions | Deterministic tests, linting, formatting, type checks, security and repo hygiene checks |
+
+## Setup
+
+Prerequisites:
+
+- Python 3.11
+- `make`
+- OpenAI API key for generation, HyDE, and real RAGAS evaluation
+
+Install dependencies:
+
+```bash
+make setup
+```
+
+Create a local environment file from the example and set secrets locally:
+
+```bash
+cp .env.example .env
+```
+
+Required:
+
+```bash
+OPENAI_API_KEY=your-openai-key
+```
+
+Optional:
+
+```bash
+USE_HYDE=false
+LANGSMITH_TRACING=true
+LANGSMITH_API_KEY=your-langsmith-key
+LANGSMITH_PROJECT=project-1-rag-qa
+```
+
+Do not commit `.env` or generated vectorstore files.
+
+## Run Order
+
+Build the local vector store from committed sample documents:
+
+```bash
+make ingest
+```
+
+Start the API:
+
+```bash
+make serve
+```
+
+Check liveness and readiness:
+
+```bash
+curl http://localhost:8000/health
+curl http://localhost:8000/readiness
+```
+
+Ask a question:
+
+```bash
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{"question":"What are the four AI RMF core functions?","top_k":5,"use_hyde":false}'
+```
+
+Start the Streamlit UI:
+
+```bash
+make ui
+```
+
+Open:
+
+- API docs: `http://localhost:8000/docs`
+- Streamlit UI: `http://localhost:8501`
+- Prometheus metrics: `http://localhost:8000/metrics`
+
+## API
+
+| Endpoint | Purpose |
+| --- | --- |
+| `GET /health` | Liveness check; returns 200 while the process is alive |
+| `GET /readiness` | Readiness check; returns 200 only when the RAG pipeline and vectorstore are loaded |
+| `POST /query` | Runs retrieval, reranking, generation, and citation extraction |
+| `GET /metrics` | Exposes FastAPI and custom RAG Prometheus metrics |
+
+`POST /query` request:
+
+```json
+{
+  "question": "What is zero trust architecture?",
+  "use_hyde": false,
+  "top_k": 5
+}
+```
+
+`POST /query` response:
+
+```json
+{
+  "answer": "...",
+  "sources": ["nist.sp.800-207.pdf.pdf"],
+  "num_chunks_retrieved": 20,
+  "retrieval_scores": []
+}
+```
+
+## Testing
+
+Default tests are deterministic and avoid paid APIs:
+
+```bash
 make test
 ```
 
-## Commands
+This runs unit and integration tests while excluding `@pytest.mark.slow` eval tests.
 
-| Command | Description |
-|---------|-------------|
-| `make setup` | Install all dependencies |
-| `make ingest` | Build FAISS vectorstore from `data/sample_docs/`; use `python scripts/run_ingest.py --force-rebuild` to overwrite an existing index |
-| `make serve` | Start FastAPI server on port 8000 |
-| `make ui` | Start Streamlit UI on port 8501 |
-| `make test` | Run unit + integration tests |
-| `make eval` | Run RAGAS evaluation (slow, requires API key) |
-| `make coverage` | Run tests and generate coverage report |
-| `make lint` | Run ruff and mypy checks |
-| `make docker-up` | Start API and UI services via docker-compose |
-| `make docker-down` | Stop docker-compose services |
-| `make clean` | Remove temporary files and caches |
+Quality evaluation is on-demand:
+
+```bash
+make eval
+```
+
+`make eval` runs slow RAG quality tests and may require local credentials depending on the evaluation path.
+
+Other checks:
+
+```bash
+make lint
+make coverage
+```
+
+GitHub Actions runs CI, CodeQL, dependency review, and repository hygiene checks on pull requests.
+
+## RAGAS Quality Gates
+
+The project uses a 10-question eval dataset in `data/eval_dataset.json`. The committed thresholds are:
+
+| Metric | Threshold | What It Catches |
+| --- | ---: | --- |
+| Faithfulness | >= 0.80 | Hallucinated or unsupported claims |
+| Answer relevancy | >= 0.70 | Answers that do not address the question |
+| Context precision | >= 0.60 | Retrieved chunks that are irrelevant |
+| Context recall | >= 0.55 | Missing supporting context |
+
+The eval suite also covers prompt-injection behavior and out-of-domain fallback behavior. Generated reports should stay local under `results/` and are intentionally not committed.
+
+## Key Design Decisions
+
+### 1. Hybrid Search Instead Of Dense-Only Retrieval
+
+Dense embeddings handle semantic matches, while BM25 handles exact terms, acronyms, and framework names. RRF fuses rank positions rather than raw scores, avoiding fragile score normalization between FAISS and BM25.
+
+Tradeoff: two retrieval paths add indexing and test complexity, but the behavior is easier to explain and debug than dense-only retrieval when exact terminology matters.
+
+### 2. Two-Stage Retrieve Then Rerank
+
+The system retrieves a wider candidate set with fast bi-encoder search, then reranks the best candidates with a CrossEncoder. The CrossEncoder sees the query and document together, which gives stronger relevance judgments for the final context window.
+
+Tradeoff: reranking adds latency and model load time, so it is applied only after candidate retrieval.
+
+### 3. HyDE As A Configurable Quality Lever
+
+HyDE expands short user questions into a hypothetical answer before retrieval. This can improve recall when the user's wording differs from document wording.
+
+Tradeoff: HyDE costs an extra LLM call, so it is controlled by config and per-query API/UI options.
+
+### 4. Readiness Separate From Liveness
+
+`/health` reports that the process is alive. `/readiness` reports that the vectorstore and RAG pipeline are loaded. This distinction keeps orchestrators from routing traffic before retrieval is available.
+
+Tradeoff: startup can succeed while readiness fails, but the failure mode is explicit and observable.
+
+### 5. Three-Layer Test Strategy
+
+Unit tests mock LLMs, vectorstores, and network services. Integration tests exercise component boundaries with local deterministic behavior. Slow eval tests validate RAG quality thresholds on demand.
+
+Tradeoff: not every quality test runs on every commit, but default CI stays fast, deterministic, and free of paid API calls.
+
+## Observability
+
+Structured request logs include:
+
+- request ID
+- method and path
+- status code
+- latency
+- question preview
+- chunks retrieved
+- retrieval strategy (`hybrid` or `hybrid+hyde`)
+
+Prometheus custom counters:
+
+- `rag_chunks_retrieved_total`
+- `rag_empty_context_total`
+
+LangSmith tracing is enabled only when configured with a key. Keep `LANGSMITH_API_KEY` out of tracked files.
+
+## Docker
+
+Start both services:
+
+```bash
+make docker-up
+```
+
+Stop both services:
+
+```bash
+make docker-down
+```
+
+The compose stack exposes:
+
+- API: `http://localhost:8000`
+- UI: `http://localhost:8501`
+
+Before using Docker for real queries, make sure the container environment has a valid `OPENAI_API_KEY` and that the vectorstore has been built or is available through the mounted project directory.
+
+The compose stack reads local secrets from `.env`; create it from `.env.example` during setup and keep it untracked.
+
+## Notebook
+
+The exploration notebook is at:
+
+```text
+notebooks/01_rag_exploration.ipynb
+```
+
+It covers document metadata, chunk-size histograms, UMAP embedding visualization, dense/BM25/hybrid retrieval comparisons, reranking impact, HyDE-style retrieval comparison, and the RAGAS threshold table. Heavy or paid sections are opt-in inside the notebook.
+
+## Repository Hygiene
+
+Do not commit:
+
+- `.env`
+- API keys or tokens
+- `data/vectorstore/*`
+- generated RAGAS reports
+- large local document dumps
+
+The `repo-guard` workflow enforces the most important hygiene checks on PRs.
