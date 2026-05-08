@@ -49,7 +49,7 @@ class RAGPipeline:
         """Run the full RAG pipeline: validate → retrieve → rerank → generate → cite.
 
         Returns dict with keys: answer, sources, num_chunks_retrieved,
-        retrieval_scores, contexts.
+        retrieval_scores, contexts, retrieval_strategy.
         Raises ValueError if question length is outside [3, 2000].
         use_hyde overrides settings.use_hyde when provided.
         top_k overrides settings.top_k_results when provided.
@@ -67,6 +67,7 @@ class RAGPipeline:
             use_hyde if use_hyde is not None else self._settings.use_hyde
         )
         effective_top_k = top_k if top_k is not None else self._settings.top_k_results
+        retrieval_strategy = "hybrid+hyde" if effective_use_hyde else "hybrid"
 
         with timer_context("pipeline.query"):
             retrieval_query = question
@@ -91,6 +92,7 @@ class RAGPipeline:
             "num_chunks_retrieved": len(candidates),
             "retrieval_scores": [],
             "contexts": [doc.page_content for doc in reranked],
+            "retrieval_strategy": retrieval_strategy,
         }
 
     def is_ready(self) -> bool:

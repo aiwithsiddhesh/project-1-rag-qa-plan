@@ -43,6 +43,9 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         question_preview = getattr(request.state, "question_preview", None)
         if question_preview is not None:
             log_entry["question_preview"] = question_preview
+        retrieval_strategy = getattr(request.state, "retrieval_strategy", None)
+        if retrieval_strategy is not None:
+            log_entry["retrieval_strategy"] = retrieval_strategy
 
         logger.info(log_entry)
         return response

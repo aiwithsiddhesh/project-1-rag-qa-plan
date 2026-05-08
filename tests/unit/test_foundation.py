@@ -24,8 +24,13 @@ from src.exceptions import (
 from src.utils import timer_context, truncate_text
 
 
-def test_settings_load_defaults_and_mask_secret() -> None:
-    settings = Settings(openai_api_key="test-api-key")
+def test_settings_load_defaults_and_mask_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("LANGSMITH_TRACING", raising=False)
+    monkeypatch.delenv("LANGSMITH_API_KEY", raising=False)
+    monkeypatch.delenv("LANGSMITH_PROJECT", raising=False)
+    settings = Settings(openai_api_key="test-api-key", _env_file=None)
 
     assert settings.openai_api_key.get_secret_value() == "test-api-key"
     assert "test-api-key" not in repr(settings)
@@ -35,7 +40,16 @@ def test_settings_load_defaults_and_mask_secret() -> None:
     assert settings.chunk_overlap == 50
     assert settings.bm25_weight == 0.4
     assert settings.dense_weight == 0.6
+    assert settings.langsmith_tracing is None
+    assert settings.langsmith_api_key is None
+    assert settings.langsmith_project == "project-1-rag-qa"
     assert settings.cors_origins == ["*"]
+
+
+def test_settings_normalizes_empty_langsmith_api_key() -> None:
+    settings = Settings(openai_api_key="test-api-key", langsmith_api_key="")
+
+    assert settings.langsmith_api_key is None
 
 
 @pytest.mark.parametrize("chunk_size", [99, 2001])

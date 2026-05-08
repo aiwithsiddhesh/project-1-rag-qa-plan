@@ -28,7 +28,9 @@ class Settings(BaseSettings):
     bm25_weight: float = 0.4
     dense_weight: float = 0.6
     use_hyde: bool = False
-    langsmith_tracing: bool = False
+    langsmith_tracing: bool | None = None
+    langsmith_api_key: SecretStr | None = None
+    langsmith_project: str = "project-1-rag-qa"
     log_level: str = "INFO"
     cors_origins: list[str] = Field(default_factory=lambda: ["*"])
 
@@ -39,6 +41,13 @@ class Settings(BaseSettings):
         if not secret_val:
             raise ValueError("OPENAI_API_KEY must not be empty")
         return SecretStr(secret_val)
+
+    @field_validator("langsmith_api_key", mode="before")
+    @classmethod
+    def normalize_langsmith_api_key(cls, value: object) -> object:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
 
     @field_validator("chunk_overlap")
     @classmethod
