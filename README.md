@@ -2,7 +2,7 @@
 
 This repository is being built phase by phase from `project-1-rag-qa-plan.md`.
 
-Current status: Phase 9 complete — Scripts + RAGAS Eval. Phase 10 (Full Test Suite) next.
+Current status: Phase 10 complete — Full Test Suite. Phase 11 (Observability) next.
 
 ## Implemented
 
@@ -53,6 +53,11 @@ Current status: Phase 9 complete — Scripts + RAGAS Eval. Phase 10 (Full Test S
 - `eval/rag_eval.py` — helpers to load eval JSON records, run RAGAS metrics (`faithfulness`, `answer_relevancy`, `context_precision`, `context_recall`), and generate a Markdown score report
 - `data/eval_dataset.json` — 10 grounded Q&A records based on the committed NIST sample documents
 
+**Phase 10 — Full Test Suite**
+- `tests/integration/test_pipeline_integration.py` — local FAISS + deterministic embedding integration tests with mocked LLM and reranker
+- `tests/eval/test_rag_quality.py` — slow/on-demand eval quality checks for metric thresholds, adversarial prompt injection, and out-of-domain fallback behavior
+- `pytest.ini` — registers the `slow` marker so default tests stay clean and eval tests remain opt-in
+
 ## Tests
 
 - `tests/unit/test_foundation.py` — Phase 1 unit tests
@@ -65,7 +70,9 @@ Current status: Phase 9 complete — Scripts + RAGAS Eval. Phase 10 (Full Test S
 - `tests/unit/test_streamlit_app.py` — tests covering Streamlit API helper behavior, health/readiness handling, API-down errors, `top_k`/HyDE payloads, and no-context detection
 - `tests/unit/test_run_ingest.py` — tests covering ingestion CLI success, RAGException exit handling, and `--force-rebuild` behavior
 - `tests/unit/test_rag_eval.py` — tests covering eval dataset validation, report generation, and RAGAS invocation with mocked dependencies
+- `tests/integration/test_pipeline_integration.py` — integration tests covering full pipeline response shape, relevant retrieval, no-context fallback, and 600-char question handling with local FAISS and mocked paid components
 - `tests/integration/test_api_integration.py` — integration tests covering /health, /readiness (200 and 503), POST /query (200, 422 for short/long input and invalid `top_k`, 503 when not ready), X-Request-ID header, use_hyde/top_k passthrough, and rate-limit 429
+- `tests/eval/test_rag_quality.py` — `@pytest.mark.slow` eval tests for RAGAS-style thresholds, prompt-injection behavior, and out-of-domain fallback
 - `tests/conftest.py` — shared fixtures (sample TXT/PDF/DOCX, empty dir, `sample_chunks`, `mock_embedding_model`, `mock_vectorstore`, `mock_llm`)
 
 Run tests:
