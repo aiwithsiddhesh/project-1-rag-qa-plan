@@ -1,0 +1,72 @@
+[
+  {
+    "question": "What is the main purpose of the NIST AI Risk Management Framework?",
+    "ground_truth": "The NIST AI Risk Management Framework helps organizations manage risks from artificial intelligence systems and improve the trustworthiness of AI through a voluntary, flexible process.",
+    "contexts": [
+      "NIST AI RMF 1.0 describes a voluntary framework for managing risks associated with AI systems and improving trustworthy AI outcomes across design, development, deployment, and use."
+    ]
+  },
+  {
+    "question": "What are the four core functions in the AI RMF?",
+    "ground_truth": "The four core functions are Govern, Map, Measure, and Manage.",
+    "contexts": [
+      "The NIST AI RMF organizes risk management work around four core functions: Govern, Map, Measure, and Manage."
+    ]
+  },
+  {
+    "question": "Why is the Govern function important in the AI RMF?",
+    "ground_truth": "Govern establishes the organizational policies, processes, roles, responsibilities, and accountability structures needed to manage AI risks across the AI lifecycle.",
+    "contexts": [
+      "In the AI RMF, Govern is an overarching function that builds organizational structures, policies, accountability, and risk management culture for AI systems."
+    ]
+  },
+  {
+    "question": "What does the AI RMF mean by trustworthy AI characteristics?",
+    "ground_truth": "Trustworthy AI characteristics include properties such as validity and reliability, safety, security and resilience, accountability and transparency, explainability and interpretability, privacy enhancement, and fairness with harmful bias managed.",
+    "contexts": [
+      "NIST AI RMF identifies trustworthy AI characteristics including valid and reliable, safe, secure and resilient, accountable and transparent, explainable and interpretable, privacy-enhanced, and fair with harmful bias managed."
+    ]
+  },
+  {
+    "question": "How does the Generative AI Profile relate to the AI RMF?",
+    "ground_truth": "The Generative AI Profile is a companion resource for the AI RMF that applies the framework to risks and risk management actions specific to generative AI.",
+    "contexts": [
+      "NIST AI 600-1, the Generative AI Profile, is designed as a companion to AI RMF 1.0 and provides guidance for managing risks associated with generative AI."
+    ]
+  },
+  {
+    "question": "What kinds of risks does the Generative AI Profile address?",
+    "ground_truth": "It addresses risks from generative AI such as misuse, information integrity problems, harmful or biased outputs, privacy concerns, security issues, and challenges in accountability and transparency.",
+    "contexts": [
+      "The Generative AI Profile discusses risks that can arise from generative AI, including misuse, harmful content, information integrity concerns, data privacy concerns, cybersecurity impacts, and accountability challenges."
+    ]
+  },
+  {
+    "question": "What is zero trust architecture according to NIST SP 800-207?",
+    "ground_truth": "Zero trust architecture is an approach to enterprise cybersecurity that assumes no implicit trust and continuously evaluates access to resources based on identity, context, policy, and other signals.",
+    "contexts": [
+      "NIST SP 800-207 describes zero trust architecture as a cybersecurity approach focused on protecting resources and removing implicit trust from access decisions."
+    ]
+  },
+  {
+    "question": "What does zero trust say about implicit trust?",
+    "ground_truth": "Zero trust says implicit trust should not be granted based only on network location or ownership; every access request should be evaluated before access is allowed.",
+    "contexts": [
+      "NIST zero trust guidance emphasizes that no subject, asset, or network location should receive implicit trust and that access decisions should be continuously evaluated."
+    ]
+  },
+  {
+    "question": "What is the role of policy in a zero trust architecture?",
+    "ground_truth": "Policy determines whether access to a resource is granted, using information such as identity, device state, resource sensitivity, requested action, and other contextual signals.",
+    "contexts": [
+      "In zero trust architecture, policy engines and enforcement points evaluate access requests using identity, device, resource, and contextual information before allowing or denying access."
+    ]
+  },
+  {
+    "question": "Why are resource-focused protections central to zero trust?",
+    "ground_truth": "Zero trust focuses protection around individual resources because perimeter-based trust is insufficient; each resource access must be authorized and enforced according to policy.",
+    "contexts": [
+      "NIST SP 800-207 frames zero trust around resource protection rather than network perimeter trust, requiring each resource access request to be evaluated and authorized."
+    ]
+  }
+]

@@ -143,6 +143,7 @@ class TestRAGPipelineQuery:
             "sources",
             "num_chunks_retrieved",
             "retrieval_scores",
+            "contexts",
         }
 
     def test_query_answer_comes_from_llm(
@@ -273,6 +274,15 @@ class TestRAGPipelineQuery:
         )
         result = pipeline.query("What is the topic?")
         assert isinstance(result["retrieval_scores"], list)
+
+    def test_query_returns_reranked_contexts(
+        self, pipeline_settings, mock_vs, mock_reranker, mock_retriever, mock_llm
+    ):
+        pipeline = make_pipeline(
+            pipeline_settings, mock_vs, mock_reranker, mock_retriever, mock_llm
+        )
+        result = pipeline.query("What is the topic?")
+        assert result["contexts"] == ["Pipeline test chunk 0", "Pipeline test chunk 1"]
 
     def test_query_use_hyde_param_true_overrides_settings_false(
         self, pipeline_settings, mock_vs, mock_reranker, mock_retriever, mock_llm

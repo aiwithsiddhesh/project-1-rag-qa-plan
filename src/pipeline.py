@@ -48,7 +48,8 @@ class RAGPipeline:
     ) -> dict:
         """Run the full RAG pipeline: validate → retrieve → rerank → generate → cite.
 
-        Returns dict with keys: answer, sources, num_chunks_retrieved, retrieval_scores.
+        Returns dict with keys: answer, sources, num_chunks_retrieved,
+        retrieval_scores, contexts.
         Raises ValueError if question length is outside [3, 2000].
         use_hyde overrides settings.use_hyde when provided.
         top_k overrides settings.top_k_results when provided.
@@ -89,6 +90,7 @@ class RAGPipeline:
             "sources": sources,
             "num_chunks_retrieved": len(candidates),
             "retrieval_scores": [],
+            "contexts": [doc.page_content for doc in reranked],
         }
 
     def is_ready(self) -> bool:
