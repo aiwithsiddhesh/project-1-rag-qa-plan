@@ -64,6 +64,13 @@ def test_run_ragas_evaluation_calls_pipeline_and_ragas(monkeypatch) -> None:
             return rows
 
     class FakeResult:
+        scores = {
+            "faithfulness": 0.91,
+            "answer_relevancy": 0.82,
+            "context_precision": 0.73,
+            "context_recall": 0.64,
+        }
+
         def to_pandas(self):
             class FakeMean:
                 def to_dict(self):
@@ -100,7 +107,10 @@ def test_run_ragas_evaluation_calls_pipeline_and_ragas(monkeypatch) -> None:
 
     class FakePipeline:
         def query(self, question: str) -> dict:
-            return {"answer": f"answer for {question}"}
+            return {
+                "answer": f"answer for {question}",
+                "contexts": [f"retrieved context for {question}"],
+            }
 
     scores = run_ragas_evaluation(
         FakePipeline(),
@@ -115,3 +125,24 @@ def test_run_ragas_evaluation_calls_pipeline_and_ragas(monkeypatch) -> None:
 
     assert scores["faithfulness"] == 0.91
     assert captured_rows["rows"][0]["answer"] == "answer for What is AI RMF?"
+    assert captured_rows["rows"][0]["contexts"] == [
+        "retrieved context for What is AI RMF?"
+    ]
+
+
+def test_run_ragas_evaluation_requires_pipeline_contexts() -> None:
+    class FakePipeline:
+        def query(self, question: str) -> dict:
+            return {"answer": f"answer for {question}"}
+
+    with pytest.raises(ValueError, match="contexts"):
+        run_ragas_evaluation(
+            FakePipeline(),
+            [
+                {
+                    "question": "What is AI RMF?",
+                    "ground_truth": "A framework.",
+                    "contexts": ["Reference context only."],
+                }
+            ],
+        )

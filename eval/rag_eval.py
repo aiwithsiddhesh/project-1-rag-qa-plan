@@ -42,11 +42,27 @@ def load_eval_dataset(path: Path) -> list[dict[str, Any]]:
 
 
 def _score_to_dict(result: Any) -> dict[str, float]:
+    if hasattr(result, "scores"):
+        return {
+            str(key): float(value)
+            for key, value in result.scores.items()
+            if isinstance(value, int | float)
+        }
     if hasattr(result, "to_pandas"):
         df = result.to_pandas()
         means = df.mean(numeric_only=True).to_dict()
         return {str(key): float(value) for key, value in means.items()}
-    return {str(key): float(value) for key, value in dict(result).items()}
+    raise TypeError("Unsupported RAGAS result object: missing scores/to_pandas.")
+
+
+def _extract_retrieved_contexts(result: dict[str, Any], question: str) -> list[str]:
+    contexts = result.get("contexts")
+    if not isinstance(contexts, list) or not contexts:
+        raise ValueError(
+            "pipeline.query must return a non-empty 'contexts' list for "
+            f"RAGAS evaluation. question={question!r}"
+        )
+    return [str(context) for context in contexts]
 
 
 def run_ragas_evaluation(
@@ -54,6 +70,18 @@ def run_ragas_evaluation(
     eval_dataset: list[dict[str, Any]],
 ) -> dict[str, float]:
     """Run RAGAS metrics against pipeline answers for the provided dataset."""
+    evaluation_rows: list[dict[str, Any]] = []
+    for record in eval_dataset:
+        result = pipeline.query(record["question"])
+        evaluation_rows.append(
+            {
+                "question": record["question"],
+                "answer": result["answer"],
+                "contexts": _extract_retrieved_contexts(result, record["question"]),
+                "ground_truth": record["ground_truth"],
+            }
+        )
+
     from datasets import Dataset
     from ragas import evaluate
     from ragas.metrics import (
@@ -62,18 +90,6 @@ def run_ragas_evaluation(
         context_recall,
         faithfulness,
     )
-
-    evaluation_rows: list[dict[str, Any]] = []
-    for record in eval_dataset:
-        result = pipeline.query(record["question"])
-        evaluation_rows.append(
-            {
-                "question": record["question"],
-                "answer": result["answer"],
-                "contexts": record["contexts"],
-                "ground_truth": record["ground_truth"],
-            }
-        )
 
     ragas_result = evaluate(
         Dataset.from_list(evaluation_rows),

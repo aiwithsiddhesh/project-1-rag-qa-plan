@@ -18,7 +18,7 @@ def _vectorstore_exists(path: Path) -> bool:
 
 
 def _clear_vectorstore(path: Path) -> None:
-    if not path.exists():
+    if not path.is_dir():
         return
 
     for child in path.iterdir():
@@ -88,6 +88,12 @@ def main() -> int:
     start = perf_counter()
 
     try:
+        if settings.vector_store_path.exists() and not settings.vector_store_path.is_dir():
+            raise RAGException(
+                "Vectorstore path exists but is not a directory.",
+                source_path=settings.vector_store_path,
+            )
+
         if _vectorstore_exists(settings.vector_store_path):
             if not args.force_rebuild:
                 raise RAGException(

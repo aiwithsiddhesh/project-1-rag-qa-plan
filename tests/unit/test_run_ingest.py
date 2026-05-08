@@ -115,6 +115,39 @@ def test_run_ingest_requires_force_rebuild_for_existing_vectorstore(
     load_documents.assert_not_called()
 
 
+def test_run_ingest_rejects_file_at_vectorstore_path(mocker, tmp_path: Path) -> None:
+    import scripts.run_ingest as run_ingest
+
+    vectorstore_path = tmp_path / "vectorstore"
+    vectorstore_path.write_text("not a directory", encoding="utf-8")
+    mocker.patch.object(
+        run_ingest,
+        "settings",
+        MagicMock(
+            chunk_size=500,
+            chunk_overlap=50,
+            log_level="INFO",
+            embedding_model="test-embedding",
+            vector_store_path=vectorstore_path,
+        ),
+    )
+    mocker.patch.object(
+        run_ingest,
+        "_parse_args",
+        return_value=MagicMock(
+            docs_path=tmp_path / "docs",
+            chunk_size=500,
+            chunk_overlap=50,
+            force_rebuild=True,
+        ),
+    )
+    mocker.patch.object(run_ingest, "setup_logging")
+    load_documents = mocker.patch.object(run_ingest, "load_documents")
+
+    assert run_ingest.main() == 1
+    load_documents.assert_not_called()
+
+
 def test_run_ingest_force_rebuild_removes_existing_vectorstore(
     mocker, tmp_path: Path, sample_chunks
 ) -> None:
