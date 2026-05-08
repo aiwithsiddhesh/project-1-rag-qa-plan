@@ -60,7 +60,7 @@ Current status: Phase 11 complete — Observability. Phase 12 (Exploration Noteb
 
 **Phase 11 — Observability**
 - `api/observability.py` — LangSmith tracing setup and Prometheus custom counters
-- LangSmith tracing defaults to requested in config, but activates only when `LANGSMITH_API_KEY` is configured; missing keys log a warning and keep tracing disabled
+- LangSmith tracing auto-enables when `LANGSMITH_API_KEY` is configured; explicit `LANGSMITH_TRACING=true` without a key logs a warning and keeps tracing disabled
 - `/metrics` exposes `rag_chunks_retrieved_total` and `rag_empty_context_total`
 - Request logs include `retrieval_strategy` (`hybrid` or `hybrid+hyde`) alongside request and retrieval metadata
 

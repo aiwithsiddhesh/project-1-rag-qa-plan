@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     bm25_weight: float = 0.4
     dense_weight: float = 0.6
     use_hyde: bool = False
-    langsmith_tracing: bool = True
+    langsmith_tracing: bool | None = None
     langsmith_api_key: SecretStr | None = None
     langsmith_project: str = "project-1-rag-qa"
     log_level: str = "INFO"

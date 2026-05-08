@@ -40,7 +40,7 @@ def test_settings_load_defaults_and_mask_secret(
     assert settings.chunk_overlap == 50
     assert settings.bm25_weight == 0.4
     assert settings.dense_weight == 0.6
-    assert settings.langsmith_tracing is True
+    assert settings.langsmith_tracing is None
     assert settings.langsmith_api_key is None
     assert settings.langsmith_project == "project-1-rag-qa"
     assert settings.cors_origins == ["*"]

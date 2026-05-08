@@ -132,4 +132,6 @@ async def query_endpoint(request: Request, body: QueryRequest) -> QueryResponse:
     )
 
 
+# Keep this after route registration so prometheus-fastapi-instrumentator sees
+# all FastAPI endpoints, including /query, /health, /readiness, and /metrics.
 Instrumentator().instrument(app).expose(app, endpoint="/metrics")

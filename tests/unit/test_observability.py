@@ -33,8 +33,26 @@ def test_configure_langsmith_enables_tracing_with_key(monkeypatch) -> None:
     assert os.environ["LANGSMITH_PROJECT"] == "test-project"
 
 
-def test_configure_langsmith_disables_tracing_without_key(monkeypatch) -> None:
+def test_configure_langsmith_auto_disables_tracing_without_key(monkeypatch) -> None:
     _reset_langsmith_env(monkeypatch)
+    settings = Settings(
+        openai_api_key="test-api-key",
+        langsmith_tracing=None,
+        langsmith_api_key=None,
+    )
+
+    configure_langsmith(settings)
+
+    assert os.environ["LANGSMITH_TRACING"] == "false"
+    assert os.environ["LANGCHAIN_TRACING_V2"] == "false"
+
+
+def test_configure_langsmith_warns_when_explicitly_enabled_without_key(
+    monkeypatch,
+    mocker,
+) -> None:
+    _reset_langsmith_env(monkeypatch)
+    warning = mocker.patch("api.observability.logger.warning")
     settings = Settings(
         openai_api_key="test-api-key",
         langsmith_tracing=True,
@@ -45,6 +63,24 @@ def test_configure_langsmith_disables_tracing_without_key(monkeypatch) -> None:
 
     assert os.environ["LANGSMITH_TRACING"] == "false"
     assert os.environ["LANGCHAIN_TRACING_V2"] == "false"
+    warning.assert_called_once()
+
+
+def test_configure_langsmith_auto_enables_tracing_with_key(monkeypatch) -> None:
+    _reset_langsmith_env(monkeypatch)
+    settings = Settings(
+        openai_api_key="test-api-key",
+        langsmith_tracing=None,
+        langsmith_api_key="langsmith-key",
+        langsmith_project="test-project",
+    )
+
+    configure_langsmith(settings)
+
+    assert os.environ["LANGSMITH_TRACING"] == "true"
+    assert os.environ["LANGCHAIN_TRACING_V2"] == "true"
+    assert os.environ["LANGSMITH_API_KEY"] == "langsmith-key"
+    assert os.environ["LANGSMITH_PROJECT"] == "test-project"
 
 
 def test_configure_langsmith_respects_disabled_tracing(monkeypatch) -> None:
