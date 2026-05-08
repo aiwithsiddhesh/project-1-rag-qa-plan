@@ -2,7 +2,7 @@
 
 This repository is being built phase by phase from `project-1-rag-qa-plan.md`.
 
-Current status: Phase 11 complete — Observability. Phase 12 (Exploration Notebook) next.
+Current status: Phase 12 complete — Exploration Notebook. Phase 13 (README) next.
 
 ## Implemented
 
@@ -63,6 +63,10 @@ Current status: Phase 11 complete — Observability. Phase 12 (Exploration Noteb
 - LangSmith tracing auto-enables when `LANGSMITH_API_KEY` is configured; explicit `LANGSMITH_TRACING=true` without a key logs a warning and keeps tracing disabled
 - `/metrics` exposes `rag_chunks_retrieved_total` and `rag_empty_context_total`
 - Request logs include `retrieval_strategy` (`hybrid` or `hybrid+hyde`) alongside request and retrieval metadata
+
+**Phase 12 — Exploration Notebook**
+- `notebooks/01_rag_exploration.ipynb` — portfolio notebook covering sample document metadata, chunk-size length distributions, UMAP embedding projection, dense/BM25/hybrid retrieval comparison, reranking impact, HyDE-style retrieval comparison, and a RAGAS threshold table
+- The notebook defaults to local-only exploration; heavyweight reranker and real RAGAS/LLM calls are opt-in via notebook flags
 
 ## Tests
 
