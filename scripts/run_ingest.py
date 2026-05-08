@@ -88,7 +88,10 @@ def main() -> int:
     start = perf_counter()
 
     try:
-        if settings.vector_store_path.exists() and not settings.vector_store_path.is_dir():
+        if (
+            settings.vector_store_path.exists()
+            and not settings.vector_store_path.is_dir()
+        ):
             raise RAGException(
                 "Vectorstore path exists but is not a directory.",
                 source_path=settings.vector_store_path,
