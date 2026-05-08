@@ -76,17 +76,21 @@ cp .env.example .env
 Required:
 
 ```bash
-OPENAI_API_KEY=your-openai-key
+OPENAI_API_KEY=
 ```
+
+Set `OPENAI_API_KEY` in your local `.env` file to a real OpenAI key.
 
 Optional:
 
 ```bash
 USE_HYDE=false
 LANGSMITH_TRACING=true
-LANGSMITH_API_KEY=your-langsmith-key
+LANGSMITH_API_KEY=
 LANGSMITH_PROJECT=project-1-rag-qa
 ```
+
+Set `LANGSMITH_API_KEY` only when you want LangSmith tracing.
 
 Do not commit `.env` or generated vectorstore files.
 
