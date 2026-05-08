@@ -10,7 +10,13 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
 from api.middleware import RequestLoggingMiddleware, limiter, setup_cors
+from api.observability import (
+    configure_langsmith,
+    rag_chunks_retrieved_total,
+    rag_empty_context_total,
+)
 from api.schemas import ErrorResponse, HealthResponse, QueryRequest, QueryResponse
+from src.contracts import NO_CONTEXT_PHRASE
 from src.config import settings
 from src.exceptions import (
     DocumentLoadError,
@@ -38,6 +44,7 @@ async def _rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONR
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     global _pipeline
     setup_logging(settings.log_level)
+    configure_langsmith(settings)
     logger.info("Starting RAG API — loading pipeline")
     try:
         _pipeline = await asyncio.to_thread(RAGPipeline, settings)
@@ -111,6 +118,11 @@ async def query_endpoint(request: Request, body: QueryRequest) -> QueryResponse:
         raise _map_rag_exception(exc) from exc
 
     request.state.num_chunks_retrieved = result["num_chunks_retrieved"]
+    request.state.retrieval_strategy = result.get("retrieval_strategy", "hybrid")
+
+    rag_chunks_retrieved_total.inc(result["num_chunks_retrieved"])
+    if not result.get("contexts") or NO_CONTEXT_PHRASE in result["answer"]:
+        rag_empty_context_total.inc()
 
     return QueryResponse(
         answer=result["answer"],

@@ -15,6 +15,8 @@ _MOCK_RESULT = {
     "sources": ["ml_intro.txt"],
     "num_chunks_retrieved": 5,
     "retrieval_scores": [],
+    "contexts": ["Machine learning enables pattern recognition at scale."],
+    "retrieval_strategy": "hybrid",
 }
 
 
@@ -109,6 +111,17 @@ class TestQueryEndpoint:
         client.post("/query", json={"question": "What is ML?"})
         mock_pipeline.query.assert_called_once_with("What is ML?", None, None)
 
+    def test_query_records_retrieval_strategy_for_logging(
+        self, client: TestClient, mock_pipeline: MagicMock, mocker
+    ) -> None:
+        logger_info = mocker.patch("api.middleware.logger.info")
+
+        r = client.post("/query", json={"question": "What is ML?"})
+
+        assert r.status_code == 200
+        query_log = logger_info.call_args_list[-1].args[0]
+        assert query_log["retrieval_strategy"] == "hybrid"
+
     def test_query_passes_top_k_to_pipeline(
         self, client: TestClient, mock_pipeline: MagicMock
     ) -> None:
@@ -141,6 +154,17 @@ class TestMiddleware:
         request_id = r.headers.get("x-request-id", "")
         assert len(request_id) == 36
         assert request_id.count("-") == 4
+
+    def test_metrics_endpoint_exposes_custom_rag_counters(
+        self, client: TestClient
+    ) -> None:
+        client.post("/query", json={"question": "What is machine learning?"})
+
+        r = client.get("/metrics")
+
+        assert r.status_code == 200
+        assert "rag_chunks_retrieved_total" in r.text
+        assert "rag_empty_context_total" in r.text
 
 
 class TestRateLimit:

@@ -2,7 +2,7 @@
 
 This repository is being built phase by phase from `project-1-rag-qa-plan.md`.
 
-Current status: Phase 10 complete — Full Test Suite. Phase 11 (Observability) next.
+Current status: Phase 11 complete — Observability. Phase 12 (Exploration Notebook) next.
 
 ## Implemented
 
@@ -35,13 +35,13 @@ Current status: Phase 10 complete — Full Test Suite. Phase 11 (Observability) 
 
 **Phase 6 — Pipeline Orchestration**
 - `RAGPipeline` in `src/pipeline.py` — wires all components: loads embedding model → loads vectorstore → extracts chunks → initializes `CrossEncoderReranker` → initializes `HybridRetriever` → initializes `ChatOpenAI`
-- `query(question, use_hyde=None, top_k=None)` — validates length (3–2000 chars), optional HyDE expansion (overridable per-call), optional per-query `top_k` override (1–20), hybrid retrieval of `top_k × fetch_k_multiplier` candidates, reranks to `top_k`, builds prompt, calls LLM with retry, extracts citations; wrapped in `timer_context` for latency logging; returns `{"answer", "sources", "num_chunks_retrieved", "retrieval_scores"}`
+- `query(question, use_hyde=None, top_k=None)` — validates length (3–2000 chars), optional HyDE expansion (overridable per-call), optional per-query `top_k` override (1–20), hybrid retrieval of `top_k × fetch_k_multiplier` candidates, reranks to `top_k`, builds prompt, calls LLM with retry, extracts citations; wrapped in `timer_context` for latency logging; returns `{"answer", "sources", "num_chunks_retrieved", "retrieval_scores", "contexts", "retrieval_strategy"}`
 - `is_ready()` — returns `True` when vectorstore loaded; used by the `/readiness` endpoint
 
 **Phase 7 — API Layer**
 - `api/schemas.py` — `QueryRequest` (question 3–2000 chars, `use_hyde: bool`, optional `top_k` 1–20), `QueryResponse`, `HealthResponse`, `ErrorResponse`
-- `api/middleware.py` — `RequestLoggingMiddleware` (JSON logs: request_id, method, path, status, latency_ms, question_preview, num_chunks_retrieved; injects `X-Request-ID` UUID response header), `setup_cors`, `limiter` (slowapi, 60 req/min on `/query`)
-- `api/main.py` — FastAPI app with lifespan (startup builds `RAGPipeline`, shutdown clears it); `POST /query` (async via `asyncio.to_thread`, supports per-query `use_hyde` and `top_k`, maps `RAGException` subclasses to HTTP 503/504/422); `GET /health` (liveness, always 200); `GET /readiness` (503 if pipeline not ready — Kubernetes uses this before routing traffic); `GET /metrics` (Prometheus via `prometheus-fastapi-instrumentator`)
+- `api/middleware.py` — `RequestLoggingMiddleware` (JSON logs: request_id, method, path, status, latency_ms, question_preview, num_chunks_retrieved, retrieval_strategy; injects `X-Request-ID` UUID response header), `setup_cors`, `limiter` (slowapi, 60 req/min on `/query`)
+- `api/main.py` — FastAPI app with lifespan (startup builds `RAGPipeline`, shutdown clears it); `POST /query` (async via `asyncio.to_thread`, supports per-query `use_hyde` and `top_k`, maps `RAGException` subclasses to HTTP 503/504/422); `GET /health` (liveness, always 200); `GET /readiness` (503 if pipeline not ready — Kubernetes uses this before routing traffic); `GET /metrics` (Prometheus via `prometheus-fastapi-instrumentator` plus RAG custom counters)
 
 **Phase 8 — Streamlit UI**
 - `app/streamlit_app.py` — chat UI backed by the FastAPI service; sidebar controls for API URL, API health/readiness, `top_k`, and HyDE
@@ -58,6 +58,12 @@ Current status: Phase 10 complete — Full Test Suite. Phase 11 (Observability) 
 - `tests/eval/test_rag_quality.py` — slow/on-demand eval quality checks for metric thresholds, adversarial prompt injection, and out-of-domain fallback behavior
 - `pytest.ini` — registers the `slow` marker so default tests stay clean and eval tests remain opt-in
 
+**Phase 11 — Observability**
+- `api/observability.py` — LangSmith tracing setup and Prometheus custom counters
+- LangSmith tracing defaults to requested in config, but activates only when `LANGSMITH_API_KEY` is configured; missing keys log a warning and keep tracing disabled
+- `/metrics` exposes `rag_chunks_retrieved_total` and `rag_empty_context_total`
+- Request logs include `retrieval_strategy` (`hybrid` or `hybrid+hyde`) alongside request and retrieval metadata
+
 ## Tests
 
 - `tests/unit/test_foundation.py` — Phase 1 unit tests
@@ -70,6 +76,7 @@ Current status: Phase 10 complete — Full Test Suite. Phase 11 (Observability) 
 - `tests/unit/test_streamlit_app.py` — tests covering Streamlit API helper behavior, health/readiness handling, API-down errors, `top_k`/HyDE payloads, and no-context detection
 - `tests/unit/test_run_ingest.py` — tests covering ingestion CLI success, RAGException exit handling, and `--force-rebuild` behavior
 - `tests/unit/test_rag_eval.py` — tests covering eval dataset validation, report generation, and RAGAS invocation with mocked dependencies
+- `tests/unit/test_observability.py` — tests covering LangSmith tracing enable/disable behavior without real keys
 - `tests/integration/test_pipeline_integration.py` — integration tests covering full pipeline response shape, relevant retrieval, no-context fallback, and 600-char question handling with local FAISS and mocked paid components
 - `tests/integration/test_api_integration.py` — integration tests covering /health, /readiness (200 and 503), POST /query (200, 422 for short/long input and invalid `top_k`, 503 when not ready), X-Request-ID header, use_hyde/top_k passthrough, and rate-limit 429
 - `tests/eval/test_rag_quality.py` — `@pytest.mark.slow` eval tests for RAGAS-style thresholds, prompt-injection behavior, and out-of-domain fallback
